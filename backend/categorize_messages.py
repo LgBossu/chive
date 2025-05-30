@@ -20,6 +20,20 @@ from utils import log_setup  # noqa: F401
 
 # ###################################################################################
 
+
+class DeprecatedError(Exception):
+    """Custom exception for deprecated features."""
+
+    pass
+
+
+raise DeprecatedError(
+    "This script is deprecated and will be removed in the future. Turn to resilient_categorize_messages.py for the new version and to get work done properly."  # noqa: E501
+)
+
+# ###################################################################################
+
+
 # II. SETUP
 
 # II.1 Initialize the paths
