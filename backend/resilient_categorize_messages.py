@@ -37,7 +37,8 @@ def categorization_loop(
 
     import torch
     from loguru import logger
-    from transformers import AutoModelForCausalLM, AutoTokenizer
+    from transformers.models.auto.modeling_auto import AutoModelForCausalLM
+    from transformers.models.auto.tokenization_auto import AutoTokenizer
 
     SAFE_MAX_LENGTH = 2048
 
@@ -82,9 +83,7 @@ def categorization_loop(
     logger.info("Clearing cache and collecting garbage")
     gc.collect()
     torch.xpu.empty_cache()
-    logger.info(
-        f"Memory info : {torch.xpu.memory_allocated()} / {torch.xpu.memory_reserved()}"
-    )  # noqa: E501
+    logger.info(f"Memory info : {torch.xpu.memory_allocated()} / {torch.xpu.memory_reserved()}")  # noqa: E501
 
     logger.info("Setting up utils")
 
@@ -92,9 +91,7 @@ def categorization_loop(
         if not duration:
             _, seconds = divmod(seconds, 86400)
             hours, seconds = divmod(seconds, 3600)
-            hours = (
-                hours + tz
-            ) % 24  # We are dealing with a date and account for timezone
+            hours = (hours + tz) % 24  # We are dealing with a date and account for timezone
         else:
             hours, seconds = divmod(seconds, 3600)
         minutes, seconds = divmod(seconds, 60)
@@ -196,10 +193,16 @@ def categorization_loop(
 
         return output
 
-    def get_categories(message: str, max_output_length: int = 25) -> str:
-        return clean_llm_output(
-            tokenize_and_summon(message, max_output_length=max_output_length)
-        )
+    def get_categories(message: str, max_output_length: int = 25) -> str | None:
+        result = tokenize_and_summon(message, max_output_length=max_output_length)
+        if result is None:
+            logger.warning("tokenize_and_summon returned None for message.")
+            return "none"
+        cleaned = clean_llm_output(result)
+        if cleaned is None:
+            logger.warning("clean_llm_output returned None for message.")
+            return "none"
+        return cleaned
 
     logger.info("Categorizing messages")
 
@@ -226,7 +229,7 @@ def categorization_loop(
             llm_processed += 1
             logger.debug(f"Categorizing message {message_id}")
             categories = get_categories(message_content)
-            if not categories:
+            if categories is None:
                 logger.info(f"Message {message_id} was skipped. Blacklisting.")
                 with open(BLACKLIST_PATH, "a") as f:
                     f.write(f"{message_id}\n")
@@ -311,14 +314,19 @@ CATEGORIZATION:"""
 
 # III.2 Utils
 
-log_line_regex = r"\d{4}-\d{2}-\d{2}T(\d{2}:\d{2}:\d{2}\.\d{6})\+\d{4}\s.\s([A-Z]+)\s*.\s\w*:[^:]*:\d*\s-\s(.*)"  # noqa: E501
+log_line_regex = (
+    r"\d{4}-\d{2}-\d{2}T(\d{2}:\d{2}:\d{2}\.\d{6})\+\d{4}\s.\s([A-Z]+)\s*.\s\w*:[^:]*:\d*\s-\s(.*)"  # noqa: E501
+)
 log_line_hunt_id = r"Categorizing message ([0-9a-f]{64})"
 
 
 def parse_log_line(line: str) -> tuple[str, str]:
     """Parses a line from the log file"""
     parsed = re.match(log_line_regex, line)
-    return parsed.groups()
+    if parsed is None:
+        logger.error(f"Failed to parse log line: {line}")
+        raise ValueError(f"Failed to parse log line: {line}")
+    return parsed.groups()[0], parsed.groups()[1]
 
 
 def check_for_timeouts(LOG_FILE: str, timeout: int = 30) -> None | str:
@@ -335,9 +343,7 @@ def check_for_timeouts(LOG_FILE: str, timeout: int = 30) -> None | str:
         if id_match:
             return id_match.groups()[0]
         else:
-            logger.warning(
-                "Did not identify the faulty message from logs. Please check formatting"
-            )
+            logger.warning("Did not identify the faulty message from logs. Please check formatting")
             logger.warning("Program will assume non-fatal stalling.")
             return "[NotAnId]"
             # raise ValueError(
@@ -383,9 +389,7 @@ if __name__ == "__main__":
         logger.info("Loading previous categorizations")
         try:
             with open(MESSAGES_CATEGORIES_PATH, "r") as f:
-                categorized_messages = {
-                    line.split(",")[0] for line in f.read().splitlines()
-                }
+                categorized_messages = {line.split(",")[0] for line in f.read().splitlines()}
             logger.success("Previous categorizations loaded successfully.")
         except FileNotFoundError as e:
             categorized_messages: set[str] = set()
@@ -425,7 +429,7 @@ if __name__ == "__main__":
         terminated = False
         while categorization_process.is_alive():
             sleep(10)
-            faulty_id = check_for_timeouts(LOG_FILE)
+            faulty_id = check_for_timeouts(str(LOG_FILE))
             if faulty_id:
                 if faulty_id == "[NotAnId]":
                     non_faulty_stalls += 1
