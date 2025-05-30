@@ -46,5 +46,5 @@ logs/*
 data/*
 
 # Other code things
-code/tests/*
-code/output_graphs/*
+backend/tests/*
+backend/output_graphs/*
