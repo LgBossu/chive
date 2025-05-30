@@ -8,6 +8,9 @@ from utils import load_paths as lp
 from utils import log_setup  # noqa: F401
 from utils import metadata_prepare as metaprep
 
+# TODO : find a way for the script to flag or skip conversations
+# that are already in the database in entirety
+
 # Initialize the paths
 logger.debug("Initializing paths")
 PATHS = lp.get_paths()
