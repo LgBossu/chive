@@ -66,7 +66,7 @@ def extract_text_content(content: dict) -> tuple[bool, str]:
         return True, format_text_content[content_type](content)
 
 
-def parse_conversation(conversation: dict) -> tuple[str, list[list[str, dict]]]:
+def parse_conversation(conversation: dict) -> tuple[str, list[list[str | dict]]]:
     """
     Parse a conversation from the JSON data.
     :param conversation: The conversation data
@@ -104,9 +104,7 @@ def parse_conversation(conversation: dict) -> tuple[str, list[list[str, dict]]]:
             # Get author's role
             role = message[JSONKeys.AUTHOR.value][JSONKeys.ROLE.value]
             # Get message content
-            is_acceptable, content = extract_text_content(
-                message[JSONKeys.CONTENT.value]
-            )
+            is_acceptable, content = extract_text_content(message[JSONKeys.CONTENT.value])
 
             messages.append(
                 [
@@ -127,9 +125,7 @@ def parse_conversation(conversation: dict) -> tuple[str, list[list[str, dict]]]:
         total += 1
         acceptable += is_acceptable
 
-    logger.debug(
-        f"Processed {total} messages, {acceptable} of which had accepted content type."
-    )
+    logger.debug(f"Processed {total} messages, {acceptable} of which had accepted content type.")
 
     return title, messages
 

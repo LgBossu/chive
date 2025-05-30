@@ -9,10 +9,8 @@ from time import time
 import chromadb
 import torch
 from loguru import logger
-from transformers import (
-    AutoModelForCausalLM,
-    AutoTokenizer,
-)
+from transformers.models.auto.modeling_auto import AutoModelForCausalLM
+from transformers.models.auto.tokenization_auto import AutoTokenizer
 from utils import load_paths as lp
 from utils import log_setup  # noqa: F401
 
@@ -180,9 +178,7 @@ def clean_llm_output(output):
 
 
 def get_categories(message: str, max_output_length: int = 25) -> str:
-    return clean_llm_output(
-        tokenize_and_summon(message, max_output_length=max_output_length)
-    )
+    return clean_llm_output(tokenize_and_summon(message, max_output_length=max_output_length))
 
 
 # III.3 Asynchronous handling to time out
@@ -230,11 +226,9 @@ def _generate_categories_worker(q: Queue, message, max_output_length):
 
 def safe_get_categories(
     message: str, message_id: str, max_output_length: int = 25, timeout: int = 30
-) -> str:
+) -> str | None:
     q = Queue()
-    p = Process(
-        target=_generate_categories_worker, args=(q, message, max_output_length)
-    )
+    p = Process(target=_generate_categories_worker, args=(q, message, max_output_length))
     p.start()
     p.join(timeout)
 
@@ -251,17 +245,13 @@ def safe_get_categories(
         return None
 
     if q.empty():
-        logger.error(
-            f"Subprocess finished but returned nothing for message {message_id}."
-        )
+        logger.error(f"Subprocess finished but returned nothing for message {message_id}.")
         return None
 
     result = q.get()
 
     if isinstance(result, Exception):
-        logger.error(
-            f"Error during category generation for message {message_id}: {result}"
-        )
+        logger.error(f"Error during category generation for message {message_id}: {result}")
         return None
 
     return result
@@ -275,6 +265,11 @@ logger.info("Loading messages from database")
 raw_messages = mess_collection.get()
 messages_ids = raw_messages["ids"]
 messages_contents = raw_messages["documents"]
+
+if messages_contents is None or messages_ids is None:
+    logger.error("No messages found in the database (database.get() returned None elements).")
+    raise ValueError("No messages found in the database.")
+
 logger.success("Messages loaded successfully from the database")
 
 logger.info("Loading previous categorizations")

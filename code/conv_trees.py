@@ -197,7 +197,7 @@ class ConversationTrees:
             # logger.debug(f"Metadata: {node.metadata["children_ids"]}")
             try:
                 for child_id in json.loads(
-                    node.metadata["children_ids"].replace("'", '"')
+                    node.metadata["children_ids"].replace("'", '"')  # type: ignore
                 ):
                     self.link_messages(node.id, child_id)
             except KeyError as e:
@@ -264,9 +264,7 @@ class ConversationTrees:
                 else:
                     graph.node(node.id, node.metadata["role"])
             elif conv_ids_table:
-                graph.node(
-                    node.id, conv_ids_table[node.metadata["conv_id"]], shape="box"
-                )
+                graph.node(node.id, conv_ids_table[node.metadata["conv_id"]], shape="box")
             else:
                 graph.node(node.id, node.metadata["conv_id"], shape="box")
             for neighbor in node.successors:
@@ -310,18 +308,14 @@ class SingleConversationTree(ConversationTrees):
                 self.add_message(message)
                 logger.trace(f"Added message {message.id} to conversation {self.id}")
             else:
-                logger.error(
-                    f"Message {message.id} does not belong in conversation {self.id}"
-                )
+                logger.error(f"Message {message.id} does not belong in conversation {self.id}")
 
     def visualize(
         self,
         tag_function: Callable[[str], str] | None = None,
     ):
         """Visualizes the conversation tree using Graphviz."""
-        graph = self.plot_graph(
-            conv_ids_table={self.id: self.title}, tag_function=tag_function
-        )
+        graph = self.plot_graph(conv_ids_table={self.id: self.title}, tag_function=tag_function)
         graph.render(
             f"conversation_{self.id}",
             outfile=f"output_graphs/conversation_tree_{self.title}.pdf",
@@ -353,28 +347,20 @@ class SingleConversationTree(ConversationTrees):
         # Start DFS from nodes with no predecessors (roots)
         roots = [node for node in self.nodes.values() if not node.predecessors]
         if len(roots) > 1:
-            logger.warning(
-                f"Unexpected behavior : Multiple roots found for conversation {self.id}"
-            )
+            logger.warning(f"Unexpected behavior : Multiple roots found for conversation {self.id}")
         for root in roots:
             dfs(root)
 
-        return ordered_nodes[
-            ::-1
-        ]  # Reverse to ensure predecessors come before successors
+        return ordered_nodes[::-1]  # Reverse to ensure predecessors come before successors
 
     def get_embedding_distance_profile(
         self,
-        distance: Callable[[np.ndarray, np.ndarray], float] = lambda x,
-        y: np.linalg.norm(x - y),
+        distance: Callable[[np.ndarray, np.ndarray], float] = lambda x, y: np.linalg.norm(x - y),
     ) -> tuple[list[int], list[float]]:
         """Computes the embedding distance profile for the conversation tree."""
 
         x = list(range(len(self.nodes) - 1))
         ordered_nodes = self.get_ordered_nodes()
-        y = [
-            distance(ordered_nodes[i].embeddings, ordered_nodes[i + 1].embeddings)
-            for i in x
-        ]  # noqa: E501
+        y = [distance(ordered_nodes[i].embeddings, ordered_nodes[i + 1].embeddings) for i in x]  # noqa: E501
 
         return x, y
