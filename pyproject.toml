@@ -52,6 +52,7 @@ opentelemetry-exporter-otlp-proto-grpc = "1.25.0"
 graphviz = "^0.20.3"
 scikit-learn = "^1.6.1"
 scikit-image = "^0.25.2"
+nbstripout = "^0.8.1"
 
 
 [tool.mypy]
@@ -61,6 +62,6 @@ strict = true
 show_error_codes = true
 
 [tool.ruff]
-line-length = 88
+line-length = 100
 select = ["E", "F", "W", "I"]  # Enforce common error codes and flake8 rules
 fix = true  # Automatically apply fixes for common issues (like import sorting or formatting)
