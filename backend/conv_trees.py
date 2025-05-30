@@ -6,6 +6,8 @@ import numpy as np
 from loguru import logger
 from tqdm import tqdm
 
+# TODO : type hint properly and clean up
+
 
 class MessageNode:
     def __init__(
