@@ -40,17 +40,12 @@ for conv in data:
     conv_collection.upsert(conv_id, documents=[title])
 
     logger.debug(f"Inserting messages for conversation: {title}")
-    messages_ids = [
-        hash.hash_message(message[0] + str(message[1])) for message in messages
-    ]
-    messages_documents = [message[0] for message in messages]
-    messages_metadata = [
-        metaprep.cast_metadata(message[1], conv_id) for message in messages
-    ]
+    messages_ids = [hash.hash_message(str(message[0]) + str(message[1])) for message in messages]
+    messages_documents = [str(message[0]) for message in messages]
+    messages_metadata = [metaprep.cast_metadata(message[1], conv_id) for message in messages]
 
-    mess_collection.upsert(
-        messages_ids, documents=messages_documents, metadatas=messages_metadata
-    )
+    mess_collection.upsert(messages_ids, documents=messages_documents, metadatas=messages_metadata)
+    # TODO : use native ChromaDB types to clarify queries and avoid metadata casting
     logger.success(f"Conversation {title} inserted")
 logger.success("All conversations inserted")
 logger.success("Process complete")
