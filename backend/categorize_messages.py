@@ -309,6 +309,9 @@ logger.info(f"Starting categorization process at {display_time(starting_time)}")
 for message_id, message_content in zip(messages_ids, messages_contents):
     message_start_time = time()
     total_processed += 1
+    logger.trace(
+        f"Processing message {message_id}, content: {message_content[:20].replace('\n','')}..., timestamp: {message_start_time}"  # noqa: E501
+    )
 
     if message_id in blacklist:
         logger.debug(f"Message {message_id} is blacklisted. Skipping.")
@@ -321,6 +324,7 @@ for message_id, message_content in zip(messages_ids, messages_contents):
         logger.debug(f"Categorizing message {message_id}")
         categories = safe_get_categories(message_content, message_id)
         if categories is None:
+            logger.debug(f"Message {message_id} could not be categorized. Skipping.")
             continue
         logger.debug(f"Categories for message {message_id}: {categories}")
         categorized_messages.add(message_id)
