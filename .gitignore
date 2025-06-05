@@ -48,3 +48,4 @@ data/*
 # Other code things
 backend/tests/*
 backend/output_graphs/*
+legacy_code/*
