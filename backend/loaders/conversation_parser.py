@@ -74,7 +74,6 @@ class ConversationParser:
         self._conversation_data = conversation_data
         self._title: str | None = None
         self._messages: list[ParsedMessage] | None = None
-        self._parse_conversation()
 
     def _retrieve_key(self, jsonkey: JSONKeys) -> Any:
         """
@@ -152,7 +151,7 @@ class ConversationParser:
 
         return (accepted_content, parsed_message)
 
-    def _parse_conversation(self) -> None:
+    def parse_conversation(self) -> None:
         logger.debug("Beginning to parse conversation")
 
         # Retrieve title
