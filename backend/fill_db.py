@@ -2,11 +2,11 @@ import json
 
 import chromadb
 from loguru import logger
-from utils import conversation_parsing_tools as cpt
-from utils import hash_utils as hash
-from utils import load_paths as lp
-from utils import log_setup  # noqa: F401
-from utils import metadata_prepare as metaprep
+from utils_legacy import conversation_parsing_tools as cpt
+from utils_legacy import hash_utils as hash
+from utils_legacy import load_paths as lp
+from utils_legacy import log_setup  # noqa: F401
+from utils_legacy import metadata_prepare as metaprep
 
 # TODO : find a way for the script to flag or skip conversations
 # that are already in the database in entirety

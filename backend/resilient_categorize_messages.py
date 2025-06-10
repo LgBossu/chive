@@ -9,7 +9,7 @@ from time import sleep
 
 import chromadb
 from loguru import logger
-from utils import load_paths as lp
+from utils_legacy import load_paths as lp
 
 set_start_method("spawn", force=True)
 
@@ -358,7 +358,7 @@ def check_for_timeouts(LOG_FILE: str, timeout: int = 30) -> None | str:
 
 if __name__ == "__main__":
     # II. SETUP
-    from utils import log_setup
+    from utils_legacy import log_setup
 
     LOG_FILE = log_setup.LOG_FILE
 

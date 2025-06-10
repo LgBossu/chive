@@ -4,7 +4,7 @@ import sys
 
 import chromadb
 from loguru import logger
-from utils import load_paths as lp
+from utils_legacy import load_paths as lp
 
 # Initialize the paths
 PATHS = lp.get_paths()

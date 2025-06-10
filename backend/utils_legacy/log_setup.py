@@ -1,9 +1,7 @@
 import sys
 
 from loguru import logger
-from utils import load_paths as lp
-
-logger.info("Setting up the logger")
+from utils_legacy import load_paths as lp
 
 # Initialize the paths
 LOG_FILE = lp.get_paths()["log_file"]
