@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Tuple
 
@@ -45,79 +46,171 @@ format_text_content = {
 }
 
 
+@dataclass
+class MessageMetadata:
+    """
+    Dataclass to hold metadata for a message.
+    """
+
+    role: str
+    cur_id: str
+    parent_id: str | None
+    children_ids: List[str]
+    timestamp: str
+
+
+@dataclass
+class ParsedMessage:
+    content: str
+    metadata: MessageMetadata
+
+
 class ConversationParser:
     def __init__(self, conversation_data: Dict[str, Any]) -> None:
         """
         Initialize the parser with raw conversation data.
         Immediately parse the conversation into structured attributes.
         """
-        self.conversation_data = conversation_data
-        self._title: str = "Untitled"
-        self._messages: List[Tuple[str, Dict[str, Any]]] = []
+        self._conversation_data = conversation_data
+        self._title: str | None = None
+        self._messages: list[ParsedMessage] | None = None
         self._parse_conversation()
 
-    def _parse_conversation(self) -> None:
-        logger.debug("Beginning to parse conversation")
-        # Retrieve title
-        self._title = self.conversation_data.get(JSONKeys.TITLE.value, "Untitled")
-        logger.debug(f"Parsing conversation titled: {self._title}")
-
-        messages_dict = self.conversation_data.get(JSONKeys.MAPPING.value, {})
-        total, accepted = 0, 0
-
-        # Process each message in the conversation.
-        for key, message_data in messages_dict.items():
-            message = message_data.get(JSONKeys.MESSAGE.value)
-            if message is None:
-                logger.debug(f"Message {key} is None")
-                continue
-
-            # Extract metadata and content.
-            role = message.get(JSONKeys.AUTHOR.value, {}).get(JSONKeys.ROLE.value, "unknown")
-            cur_id = message_data.get(JSONKeys.CUR_ID.value)
-            parent_id = message_data.get(JSONKeys.PARENT_ID.value)
-            children_ids = message_data.get(JSONKeys.CHILDREN_IDS.value, [])
-            timestamp = message_data.get(JSONKeys.TIMESTAMP.value, "no-timestamp")
-
-            success, content = self._extract_text_content(message.get(JSONKeys.CONTENT.value, {}))
-            self._messages.append(
-                (
-                    content,
-                    {
-                        "role": role,
-                        "cur_id": cur_id,
-                        "parent_id": parent_id,
-                        "children_ids": children_ids,
-                        "timestamp": timestamp,
-                    },
-                )
-            )
-            total += 1
-            accepted += int(success)
-
-        logger.debug(f"Processed {total} messages, {accepted} with accepted content type.")
-
-    def _extract_text_content(self, content: Dict[str, Any]) -> Tuple[bool, str]:
+    def _retrieve_key(self, jsonkey: JSONKeys) -> Any:
         """
-        Extract text content based on the content type.
+        Retrieve a value from the conversation data using the specified JSON key.
+        Raises ValueError if the key is not found.
+        :param jsonkey: The JSON key to retrieve
+        :return: The value associated with the JSON key
+        :raises ValueError: If the key is not found in the conversation data
+        """
+        try:
+            return self._conversation_data[jsonkey.value]
+        except KeyError as e:
+            logger.warning(
+                f"No value found under {jsonkey.value} found in conversation data, parsing cannot proceed."  # noqa: E501
+            )
+            raise ValueError(f"Key {jsonkey.value} missing in conversation data") from e
+
+    def _parse_message_content(self, content: Dict[str, Any]) -> Tuple[bool, str]:
+        """
+        Parse the content of a message and return its text representation.
+        :param content: The content dictionary of the message
+        :return: A tuple containing a boolean indicating success and the text content
         """
         content_type = content.get(JSONKeys.CONTENT_TYPE.value, "")
         if content_type not in accepted_content_types:
             return False, "[non-text content]"
         return True, format_text_content[content_type](content)
 
+    def _parse_individual_message(
+        self, message_data: Dict[str, Any]
+    ) -> None | Tuple[bool, ParsedMessage]:
+        """
+        Parse an individual message from the conversation data.
+        :param message_data: The message data to parse
+        :return: A tuple containing the content and metadata of the message
+        """
+        if not isinstance(message_data, dict):
+            logger.error("Message data must be a dictionary")
+            raise ValueError("Message data must be a dictionary")
+
+        message = message_data.get(JSONKeys.MESSAGE.value, None)
+
+        # Handle the None case
+        if message is None:
+            return None
+
+        # Extract metadata and content.
+        try:
+            cur_id = message_data[JSONKeys.CUR_ID.value]
+            parent_id = message_data[JSONKeys.PARENT_ID.value]
+            children_ids = message_data[JSONKeys.CHILDREN_IDS.value].copy()
+        except KeyError as e:
+            logger.error(f"Missing key in message data: {e}")
+            raise ValueError(f"Missing key in message data: {e}") from e
+
+        try:
+            role = message[JSONKeys.AUTHOR.value][JSONKeys.ROLE.value]
+            timestamp = message_data[JSONKeys.TIMESTAMP.value]
+        except KeyError as e:
+            logger.error(f"Missing key in message author or timestamp: {e}")
+            raise ValueError(f"Missing key in message author or timestamp: {e}") from e
+
+        accepted_content, content = self._parse_message_content(
+            message.get(JSONKeys.CONTENT.value, {})
+        )
+
+        metadata = MessageMetadata(
+            role=role,
+            cur_id=cur_id,
+            parent_id=parent_id,
+            children_ids=children_ids,
+            timestamp=timestamp,
+        )
+        parsed_message = ParsedMessage(content=content, metadata=metadata)
+
+        return (accepted_content, parsed_message)
+
+    def _parse_conversation(self) -> None:
+        logger.debug("Beginning to parse conversation")
+
+        # Retrieve title
+        self._title = self._retrieve_key(JSONKeys.TITLE)
+        assert isinstance(self._title, str), "Title must be a string"
+        logger.debug(f"Parsing conversation titled: {self._title.encode('utf-8', 'replace')}")
+
+        # Retrieve messages mapping as a dictionary
+        messages_dict = self._retrieve_key(JSONKeys.MAPPING)
+        assert isinstance(messages_dict, dict), "Messages mapping must be a dictionary"
+        logger.debug("Successfully retrieved messages mapping.")
+
+        # Keep track of total messages and messages of accepted content types
+        total, accepted = 0, 0
+
+        # Initialize the messages list
+        self._messages = []
+
+        # Process each message in the conversation.
+        for key, message_data in messages_dict.items():
+            # Process the message in all generality
+            parsing_result = self._parse_individual_message(message_data)
+            total += 1  # Increment total messages processed
+
+            if parsing_result is None:
+                # In the None case, we skip the message (nothing relevant to append)
+                logger.debug(f"Message {key} is None or not found, skipping.")
+                continue
+            else:
+                # In the case of a valid message, we unpack the result
+                success, parsed_message = parsing_result
+                if not success:
+                    logger.debug(f"Message {key} has non-accepted content type.")
+
+                self._messages.append(parsed_message)
+                accepted += success  # Increment accepted messages if content is valid
+
+        logger.debug(f"Processed {total} messages, {accepted} with accepted content type.")
+
     @property
     def title(self) -> str:
         """
         Returns the conversation title.
         """
+        if self._title is None:
+            logger.error("Title has not been set. Ensure conversation data is valid.")
+            raise ValueError("Title has not been set. Ensure conversation data is valid.")
+        assert isinstance(self._title, str), "Title must be a string"
         return self._title
 
     @property
-    def messages(self) -> List[Tuple[str, Dict[str, Any]]]:
+    def messages(self) -> List[ParsedMessage]:
         """
         Returns the structured messages.
         """
+        if self._messages is None:
+            logger.error("Messages have not been parsed. Ensure conversation data is valid.")
+            raise ValueError("Messages have not been parsed. Ensure conversation data is valid.")
         return self._messages
 
 
@@ -141,5 +234,5 @@ if __name__ == "__main__":
 
     parser = ConversationParser(example_data)
     logger.info(f"Conversation title: {parser.title}")
-    for content, meta in parser.messages:
-        logger.info(f"Message: {content} | Metadata: {meta}")
+    for parsed_message in parser.messages:
+        logger.info(f"Message: {parsed_message.content} | Metadata: {parsed_message.metadata}")
