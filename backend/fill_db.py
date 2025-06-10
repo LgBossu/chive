@@ -2,7 +2,7 @@ import json
 
 import chromadb
 from loguru import logger
-from utils_legacy import conversation_parsing_tools as cpt
+from legacy_code.legacy_backend import conversation_parsing_tools as cpt
 from utils_legacy import hash_utils as hash
 from utils_legacy import load_paths as lp
 from utils_legacy import log_setup  # noqa: F401
