@@ -7,10 +7,38 @@
 <head>
     <meta charset="UTF-8" />
     <title>Prototype interface</title>
+    <link rel="stylesheet" href="styles/style.css" />
 </head>
 
 <body>
+    <div id="app-container">
 
+        <div id="conversation-panel">
+            <div class="message assistant">Assistant message</div>
+            <div class="message user">User message</div>
+            <div class="message assistant">Assistant message</div>
+        </div>
+
+        <div id="side-panel">
+            <section id="search-database">
+                <h2>Search Database</h2>
+                <input type="text" placeholder="Semantic search" />
+                <button>Filter by conv</button>
+                <button>Filter by thread</button>
+                <button>Filter by tone tag</button>
+                <button>Etc...</button>
+                <button>Send Request</button>
+            </section>
+
+            <section id="edit-metadata">
+                <h2>Edit Special Metadata</h2>
+                <textarea placeholder="Manual metadata entry or editing..."></textarea>
+                <button>Update Metadata</button>
+            </section>
+        </div>
+
+    </div>
 </body>
+
 
 </html>
