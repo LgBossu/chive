@@ -44,7 +44,9 @@ dmypy.json
 # Logs and data
 logs/*
 data/*
+*.odg
 
 # Other code things
 backend/tests/*
 backend/output_graphs/*
+legacy_code/
