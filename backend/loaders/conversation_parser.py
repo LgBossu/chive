@@ -57,6 +57,8 @@ class MessageMetadata:
     parent_id: str | None
     children_ids: List[str]
     timestamp: str | None
+    # TODO : CHANGE THE TIMESTAMP TO HANDLE FLOATS,
+    # AND PROPAGATE IT THROUGH THE PIPELINE
 
     def to_dict(self) -> Dict[str, Union[str, int, float, bool]]:
         """
