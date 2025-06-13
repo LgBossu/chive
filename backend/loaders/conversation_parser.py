@@ -56,7 +56,7 @@ class MessageMetadata:
     cur_id: str
     parent_id: str | None
     children_ids: List[str]
-    timestamp: str
+    timestamp: str | None
 
     def to_dict(self) -> Dict[str, Union[str, int, float, bool]]:
         """
@@ -74,7 +74,7 @@ class MessageMetadata:
             "cur_id": self.cur_id,
             "parent_id": self.parent_id if self.parent_id is not None else str(None),
             "children_ids": str(self.children_ids),
-            "timestamp": self.timestamp,
+            "timestamp": self.timestamp if self.timestamp is not None else str(None),
         }
 
     def __str__(self) -> str:
@@ -163,9 +163,14 @@ class ConversationParser:
 
         try:
             role = message[JSONKeys.AUTHOR.value][JSONKeys.ROLE.value]
-            timestamp = message_data[JSONKeys.TIMESTAMP.value]
+            timestamp = message[JSONKeys.TIMESTAMP.value]
+            if timestamp != "None":
+                logger.trace(f"Message timestamp found: {timestamp}")
         except KeyError as e:
-            logger.error(f"Missing key in message author or timestamp: {e}")
+            logger.error(f"""Missing key in message author or timestamp: {e}.
+                         Faulty message data: {message_data}
+
+                         Faulty message: {message}""")
             raise ValueError(f"Missing key in message author or timestamp: {e}") from e
 
         accepted_content, content = self._parse_message_content(
@@ -189,7 +194,7 @@ class ConversationParser:
         # Retrieve title
         self._title = self._retrieve_key(JSONKeys.TITLE)
         assert isinstance(self._title, str), "Title must be a string"
-        logger.debug(f"Parsing conversation titled: {self._title.encode('utf-8', 'replace')}")
+        logger.debug(f"Parsing conversation titled: {self._title}")
 
         # Retrieve messages mapping as a dictionary
         messages_dict = self._retrieve_key(JSONKeys.MAPPING)
@@ -210,13 +215,13 @@ class ConversationParser:
 
             if parsing_result is None:
                 # In the None case, we skip the message (nothing relevant to append)
-                logger.debug(f"Message {key} is None or not found, skipping.")
+                logger.trace(f"Message {key} is None or not found, skipping.")
                 continue
             else:
                 # In the case of a valid message, we unpack the result
                 success, parsed_message = parsing_result
                 if not success:
-                    logger.debug(f"Message {key} has non-accepted content type.")
+                    logger.trace(f"Message {key} has non-accepted content type.")
 
                 self._messages.append(parsed_message)
                 accepted += success  # Increment accepted messages if content is valid

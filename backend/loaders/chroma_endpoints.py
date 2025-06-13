@@ -3,12 +3,12 @@
 from typing import Dict, List, Mapping, NamedTuple, Tuple, Union
 
 import chromadb
-from conversation_loader import ConversationLoader
-from conversation_parser import ConversationParser, ParsedMessage
 from loguru import logger
 
-from ..utils import hash_utils as hash_utils
-from ..utils.path_utils import get_paths
+from backend.loaders.conversation_loader import ConversationLoader
+from backend.loaders.conversation_parser import ConversationParser, ParsedMessage
+from backend.utils import hash_utils as hash_utils
+from backend.utils.path_utils import get_paths
 
 DB_PATH = get_paths().chroma_db_path
 
@@ -192,6 +192,8 @@ class ChromaUpserter:
             metadatas=mess_data.metadatas,
         )
 
+        logger.success(f"Conversation '{upsertable_conv.title.title}' upserted successfully.")
+
     def upsert_all_conversations(self) -> None:
         """
         Upsert all conversations from the ConversationLoader into the ChromaDB collections.
@@ -212,12 +214,24 @@ class ChromaCreator:
 
 
 if __name__ == "__main__":
+    from backend.utils.log_setup import LoggerSetup
+
+    LoggerSetup.configure_logger()
+
+    logger.info("Starting ChromaDB upsert process...")
+    logger.warning("""You are running the ChromaDB upsert script directly.
+                   This is intended for debugging purposes only.
+                   This WILL also upsert all conversations.
+
+                   This script is not intended for production use.
+                   Users stay advised.""")
+
     # Load Chroma collections and display the number of entries in each
-    collections = client.list_collections()
-    for collection in collections:
-        col = client.get_collection(collection.name)
+    collection_names = client.list_collections()
+    for name in collection_names:
+        col = client.get_collection(name)
         count = col.count()
-        logger.info(f"Collection '{collection.name}' has {count} entries.")
+        logger.info(f"Collection '{name}' has {count} entries.")
 
     # Example usage
     upserter = ChromaUpserter()
