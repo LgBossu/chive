@@ -2,6 +2,14 @@ import hashlib
 
 from loguru import logger
 
+# TODO : hashing contents to generate database IDs is a legacy
+# of very very early versions of the project.
+# Hashing message and metadata together lets us avoid collisions,
+# but breaks down when we slightly change the metadata formatting and extraction.
+# This should be refactored to use a more robust ID generation strategy in the future.
+# Plan is to eventually switch to UUIDs or a similar approach that guarantees uniqueness without
+# relying on the content of the message.
+
 
 def hash_message(message: str) -> str:
     """
