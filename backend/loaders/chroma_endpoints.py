@@ -160,6 +160,9 @@ class UpsertableConversation:
 class ChromaUpserter:
     """A wrapper class to properly upsert conversations into ChromaDB."""
 
+    # TODO : find a way for the script to flag or skip conversations
+    # that are already in the database in entirety
+
     def __init__(self) -> None:
         """
         Initialize the ChromaUpserter with the ChromaDB client and collections.
