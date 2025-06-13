@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Union
 
 from loguru import logger
 
@@ -58,11 +58,43 @@ class MessageMetadata:
     children_ids: List[str]
     timestamp: str
 
+    def to_dict(self) -> Dict[str, Union[str, int, float, bool]]:
+        """
+        Convert the metadata to a dictionary.
+        :return: A dictionary representation of the metadata
+
+        The type hinting matches that of chromadb.Metadata,
+        which is a mapping of string keys to values of various types.
+        This function is critical for hashing messages in the pipeline,
+        as the hash argument is this method's output.
+        :rtype: Dict[str, Union[str, int, float, bool]]
+        """
+        return {
+            "role": self.role,
+            "cur_id": self.cur_id,
+            "parent_id": self.parent_id if self.parent_id is not None else str(None),
+            "children_ids": str(self.children_ids),
+            "timestamp": self.timestamp,
+        }
+
+    def __str__(self) -> str:
+        return str(self.to_dict())
+
 
 @dataclass
 class ParsedMessage:
     content: str
     metadata: MessageMetadata
+
+    def __str__(self) -> str:
+        """
+        String representation of the ParsedMessage.
+        :return: A string representation of the message content and metadata
+
+        This function is critical for hashing messages in the pipeline,
+        as the hash argument is this method's output.
+        """
+        return self.content + str(self.metadata)
 
 
 class ConversationParser:
