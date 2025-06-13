@@ -1,8 +1,11 @@
 """Wrappers for the ChromaDB access, as endpoints with safe methods"""
 
-from typing import Dict, List, Mapping, NamedTuple, Tuple, Union
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Dict, List, Mapping, NamedTuple, Optional, Set, Tuple, Union
 
 import chromadb
+import chromadb.api
 from loguru import logger
 
 from backend.loaders.conversation_loader import ConversationLoader
@@ -10,21 +13,9 @@ from backend.loaders.conversation_parser import ConversationParser, ParsedMessag
 from backend.utils import hash_utils as hash_utils
 from backend.utils.path_utils import get_paths
 
-DB_PATH = get_paths().chroma_db_path
-
-if not DB_PATH.exists():
-    logger.warning(
-        f"ChromaDB path {DB_PATH} does not exist. Recommended checking env variables or creating a new database."  # noqa: E501
-    )
-    # DB_PATH.mkdir(parents=True, exist_ok=True)
-    raise FileNotFoundError(
-        f"ChromaDB path {DB_PATH} does not exist. Please check the configuration."
-    )
-
-client = chromadb.PersistentClient(path=str(DB_PATH))
-
-
-Metadata = Mapping[str, Union[str, int, float, bool]]  # Mimic chromadb.Metadata type
+Metadata = Mapping[
+    str, Union[str, int, float, bool]
+]  # Mimic chromadb.Metadata type for easier type hinting
 
 
 class UpsertMessageArgs(NamedTuple):
@@ -157,20 +148,118 @@ class UpsertableConversation:
         return self.title.cast(), self.messages.cast()
 
 
+@dataclass(frozen=True)
+class CollectionsNames:
+    """
+    A dataclass to hold the names of the ChromaDB collections.
+
+    We do NOT want any tinkering with the collection names.
+    """
+
+    # TODO : store default collection names in a config file, rather than hardcoding them here.
+
+    conversations: str = "conversations"
+    messages: str = "messages"
+
+    def to_dict(self) -> Dict[str, str]:
+        """
+        Convert the CollectionsNames instance to a dictionary.
+
+        :return: A dictionary representation of the collection names
+        """
+        return {
+            "conversations": self.conversations,
+            "messages": self.messages,
+        }
+
+    def missing_keys(self, provided: Dict[str, str]) -> Set[str]:
+        """
+        Check which keys are missing from the provided dictionary
+        compared to the default collection names.
+
+        :param provided: The dictionary of provided collection names
+        :return: A list of missing keys
+        """
+        return set(self.to_dict().keys()).difference(provided.keys())
+
+
+COLLECTIONS_NAMES = CollectionsNames()
+
+
+def connect(creator_mode: bool = False) -> chromadb.api.ClientAPI:
+    """
+    Connect to the ChromaDB persistent client.
+    This function retrieves the database path and initializes the client.
+
+    :rtype: chromadb.api.ClientAPI
+    """
+    DB_PATH = get_paths().chroma_db_path
+    exists = DB_PATH.exists()
+
+    if not exists and not creator_mode:
+        # We are trying to connect as readers to a database that does not exist.
+        # Log critical (for VERY unexpected behavior, possibly corrupted storage),
+        # then raise an error (for error at runtime or invalid config).
+        logger.critical(
+            f"ChromaDB under path {DB_PATH} does not exist. Recommended checking env variables or creating a new database first."  # noqa: E501
+        )
+        raise FileNotFoundError(
+            f"ChromaDB path {DB_PATH} does not exist. Please check the configuration."
+        )
+    elif not exists and creator_mode:
+        # We are trying to connect as creators to a database that does not exist.
+        # This is expected behavior, so we log info, and warn about the `parents=True` flag.
+        logger.info(f"ChromaDB under path {DB_PATH} does not exist. Creating a new database.")
+        logger.warning(
+            "User be advised, database creation includes creating missing path parent directories."
+        )
+        DB_PATH.mkdir(
+            parents=True, exist_ok=False
+        )  # Create the directory. It will raise an error if it already exists,
+        #    but it shouldn't already exist if we're here.
+    elif exists and creator_mode:
+        # We are trying to connect as creators to a database that already exists.
+        # This is unexpected behavior, so we log and raise an error.
+        logger.critical(
+            f"ChromaDB under path {DB_PATH} already exists. Recommended checking env variables or using the upsert script."  # noqa: E501
+        )
+        raise FileExistsError(
+            f"ChromaDB path {DB_PATH} already exists. Please check the configuration."
+        )
+    else:
+        # We are trying to connect as readers to a database that already exists.
+        # This is expected behavior, so we log info.
+        logger.info(f"Connecting to existing ChromaDB at {DB_PATH}.")
+
+    # Initialize the ChromaDB persistent client
+    # After previous checks, the database path should exist.
+    logger.debug(f"Initializing ChromaDB client with path: {DB_PATH}")
+    return chromadb.PersistentClient(path=str(DB_PATH))
+
+
 class ChromaUpserter:
     """A wrapper class to properly upsert conversations into ChromaDB."""
 
     # TODO : find a way for the script to flag or skip conversations
     # that are already in the database in entirety
 
-    def __init__(self) -> None:
+    def __init__(self, client: Optional[chromadb.api.ClientAPI] = None) -> None:
         """
         Initialize the ChromaUpserter with the ChromaDB client and collections.
+
+        The database path is retrieved, checked for existence,
+        and the client instantiated AT RUNTIME.
+
+        If the database path does not exist,
+        a critical error is logged and a FileNotFoundError is raised.
         """
+        if client is None:
+            client = connect()
+
         self.client = client
 
-        self.conv_collection_name = "conversations"
-        self.mess_collection_name = "messages"  # TODO : store names properly in env or something
+        self.conv_collection_name = COLLECTIONS_NAMES.conversations
+        self.mess_collection_name = COLLECTIONS_NAMES.messages
 
         self.conv_collection = self.client.get_collection(self.conv_collection_name)
         self.mess_collection = self.client.get_collection(self.mess_collection_name)
@@ -180,6 +269,7 @@ class ChromaUpserter:
     def upsert_conversation(self, conversation: ConversationParser) -> None:
         """
         Upsert a single conversation into the ChromaDB collections.
+
         :param conversation: The ConversationParser instance containing the parsed conversation
         """
         upsertable_conv = UpsertableConversation(conversation)
@@ -209,11 +299,109 @@ class ChromaUpserter:
 
 
 class ChromaQuerier:
+    # TODO
     pass
 
 
 class ChromaCreator:
-    pass
+    """
+    ChromaCreator is a utility class for initializing and managing ChromaDB collections with configurable embedding functions, collection names, and database paths.
+    This class facilitates the creation of ChromaDB collections by allowing the user to specify custom embedding functions (either a single function or a tuple of two), override default collection names, and set a custom database path. It ensures that all required collection names are provided and that embedding functions are correctly configured. The class provides methods to create the ChromaDB client and its collections, handling all necessary setup and validation.
+    Attributes:
+        collection_names (Dict[str, str]): Mapping of collection keys to their names.
+        db_path (Path): Path to the ChromaDB database.
+        embedding_functions (Tuple[chromadb.EmbeddingFunction, chromadb.EmbeddingFunction]): Tuple containing embedding functions for the collections.
+    Methods:
+        __init__(...): Initializes the ChromaCreator with embedding functions, collection names, and database path.
+        _create_collections(client): Creates the required ChromaDB collections using the provided client.
+        create(): Instantiates the ChromaDB client and creates the collections.
+    """  # noqa: E501
+
+    def __init__(
+        self,
+        embedding_function: chromadb.EmbeddingFunction
+        | Tuple[chromadb.EmbeddingFunction, chromadb.EmbeddingFunction]
+        | None = None,
+        nondefault_collection_names: Dict[str, str] | None = None,
+        nondefault_db_path: str | Path | None = None,
+    ) -> None:
+        """
+        Initializes the class with embedding functions, collection names, and database path.
+        Args:
+            embedding_function (chromadb.EmbeddingFunction | Tuple[chromadb.EmbeddingFunction, chromadb.EmbeddingFunction] | None, optional):
+                The embedding function(s) to use. Can be a single embedding function, a tuple of two embedding functions, or None.
+                If a single function is provided, it will be used for both roles. If None, embedding functions must be set later.
+            nondefault_collection_names (Dict[str, str] | None, optional):
+                A dictionary mapping required collection names. If None, defaults are loaded from COLLECTIONS_NAMES.
+                Raises ValueError if required keys are missing.
+            nondefault_db_path (str | Path | None, optional):
+                The path to the database. If None, uses the default path from get_paths().chroma_db_path.
+                If a string is provided, it is converted to a Path object.
+        Raises:
+            ValueError: If nondefault_collection_names does not contain all required keys,
+                or if embedding_function is a tuple but does not contain exactly two functions.
+        """  # noqa: E501
+
+        # Handle collection names
+        if nondefault_collection_names is None:
+            nondefault_collection_names = COLLECTIONS_NAMES.to_dict()
+        elif isinstance(nondefault_collection_names, dict) and not set(
+            COLLECTIONS_NAMES.to_dict().keys()
+        ).issubset(nondefault_collection_names.keys()):
+            logger.error(
+                f"Provided nondefault_collection_names does not contain required keys: {COLLECTIONS_NAMES.missing_keys(nondefault_collection_names)}"  # noqa: E501
+            )
+            raise ValueError(
+                f"Provided nondefault_collection_names does not contain required keys: {COLLECTIONS_NAMES.missing_keys(nondefault_collection_names)}"  # noqa: E501
+            )
+        self.collection_names = nondefault_collection_names
+
+        # Handle database path
+        if nondefault_db_path is None:
+            nondefault_db_path = get_paths().chroma_db_path
+        elif isinstance(nondefault_db_path, str):
+            nondefault_db_path = Path(nondefault_db_path)
+        self.db_path = nondefault_db_path
+
+        # Handle embedding functions
+        if not isinstance(embedding_function, tuple):
+            self.embedding_functions = (embedding_function, embedding_function)
+        elif len(embedding_function) != 2:
+            logger.error(
+                "Provided embedding_function must be a single function or a tuple of two functions."
+            )
+            raise ValueError(
+                "Provided embedding_function must be a single function or a tuple of two functions."
+            )
+        else:
+            self.embedding_functions = embedding_function
+
+    def _create_collections(self, client: chromadb.api.ClientAPI) -> None:
+        """
+        Create the ChromaDB collections with the specified names.
+        :param client: The ChromaDB client to use for creating collections
+        """
+        logger.info("Creating ChromaDB collections...")
+        for i, key in enumerate(COLLECTIONS_NAMES.to_dict().keys()):
+            collection_to_create = self.collection_names[key]
+            client.create_collection(
+                name=collection_to_create,
+                embedding_function=self.embedding_functions[i],
+            )
+
+    def create(self) -> chromadb.api.ClientAPI:
+        """
+        Create the ChromaDB client and collections.
+        :return: The ChromaDB client with the created collections
+        """
+        logger.info(f"Connecting to new ChromaDB at {self.db_path}...")
+        client = connect(creator_mode=True)
+
+        # Create collections if they do not exist
+        self._create_collections(client)
+
+        logger.success("ChromaDB client and collections created successfully.")
+        return client
 
 
 if __name__ == "__main__":
@@ -229,14 +417,11 @@ if __name__ == "__main__":
                    This script is not intended for production use.
                    Users stay advised.""")
 
-    # Load Chroma collections and display the number of entries in each
-    collection_names = client.list_collections()
-    for name in collection_names:
-        col = client.get_collection(name)
-        count = col.count()
-        logger.info(f"Collection '{name}' has {count} entries.")
-
-    # Example usage
-    upserter = ChromaUpserter()
+    # Debug run
+    creator = ChromaCreator()
+    client = creator.create()
+    upserter = ChromaUpserter(client=client)
     upserter.upsert_all_conversations()
-    logger.info("ChromaDB upsert completed.")
+    logger.info("ChromaDB upsert process completed successfully.")
+    logger.info("You can now use the ChromaDB client to query or manipulate the data.")
+    logger.info("ChromaDB client is ready for use.")
