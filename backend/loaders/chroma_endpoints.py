@@ -3,11 +3,12 @@
 from typing import Dict, List, Mapping, NamedTuple, Tuple, Union
 
 import chromadb
-import utils.hash_utils as hash_utils
 from conversation_loader import ConversationLoader
 from conversation_parser import ConversationParser, ParsedMessage
 from loguru import logger
-from utils.path_utils import get_paths
+
+from ..utils import hash_utils as hash_utils
+from ..utils.path_utils import get_paths
 
 DB_PATH = get_paths().chroma_db_path
 
@@ -152,6 +153,7 @@ class UpsertableConversation:
         Cast the UpsertableConversation to a proper argument for upserting into ChromaDB.
         :return: A tuple containing the conversation data and messages data
         """
+        logger.trace(f"Casting UpsertableConversation: {self.title.title}")
         return self.title.cast(), self.messages.cast()
 
 
@@ -207,3 +209,17 @@ class ChromaQuerier:
 
 class ChromaCreator:
     pass
+
+
+if __name__ == "__main__":
+    # Load Chroma collections and display the number of entries in each
+    collections = client.list_collections()
+    for collection in collections:
+        col = client.get_collection(collection.name)
+        count = col.count()
+        logger.info(f"Collection '{collection.name}' has {count} entries.")
+
+    # Example usage
+    upserter = ChromaUpserter()
+    upserter.upsert_all_conversations()
+    logger.info("ChromaDB upsert completed.")

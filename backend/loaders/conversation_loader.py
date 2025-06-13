@@ -3,7 +3,8 @@ from typing import Any, Dict, List
 
 from conversation_parser import ConversationParser
 from loguru import logger
-from utils.path_utils import get_paths
+
+from ..utils.path_utils import get_paths
 
 
 class ConversationLoader:
