@@ -10,6 +10,69 @@ from loguru import logger
 # Plan is to eventually switch to UUIDs or a similar approach that guarantees uniqueness without
 # relying on the content of the message.
 
+# Below, an AI-generated explanation of the hybrid message identification system
+
+# ─────────────────────────────────────────────────────────────────────────────
+# HYBRID MESSAGE IDENTIFICATION SYSTEM: HASH + UUID
+#
+# Motivation:
+# In this system, every message in the Chroma database is identified by a *deterministic*
+# content-based hash (generated from the message text + metadata), which serves as the
+# primary key for database upserts. This allows us to avoid duplicate entries when
+# re-running ingestion scripts or syncing with external sources — as long as the
+# message and its relevant metadata stay consistent, the hash will too.
+#
+# However, hashes are fragile: even small changes in formatting, metadata fields,
+# or whitespace can result in a completely different hash. Over time, this makes
+# maintenance and external referencing brittle, especially if you change the
+# metadata schema (which is *inevitable* in a long-running project).
+#
+# To solve this, we assign a *secondary*, persistent, and non-deterministic UUID
+# to each message at the time of first ingestion. This UUID is stored alongside
+# the message in the database as part of its metadata. This creates a stable
+# identity reference that can be reused for things like:
+#  - dynamic tagging systems
+#  - semantic search results
+#  - external references in metadata files
+#  - long-term exports or cross-database linking
+#
+# The system works like this:
+#
+# 1. On message ingestion:
+#    - A deterministic hash is computed from the message content + metadata.
+#    - This hash becomes the Chroma message ID (used for upserting).
+#    - If this hash is not yet known, a new UUID is generated and associated with it.
+#    - The UUID is stored *in the message's metadata*, for long-term use.
+#
+# 2. When re-ingesting:
+#    - The hash is re-computed from the message.
+#    - If the hash already exists, we *reuse* the UUID from the previous ingestion.
+#    - If not, we treat the message as new and assign a new UUID.
+#
+# This system gives you:
+#    ✅ Duplicate prevention via deterministic IDs
+#    ✅ Long-term message identity via UUID
+#    ✅ Flexibility to update schemas without breaking identity
+#
+# This approach future-proofs your database and allows for external tools
+# (like classification scripts, frontend queries, or semantic exports)
+# to operate robustly, even if message metadata or structure evolves.
+#
+# Pro tip:
+# You should persist the hash → UUID mapping (e.g., as a JSON file)
+# to avoid regenerating UUIDs across runs. This lets you restore identity
+# after crashes or refactors.
+#
+# Example:
+# {
+#     "fa4c893b41e66f...": "8b4fbd4e-054b-11ef-9d4a-4f92f7f460dd",
+#     ...
+# }
+#
+# This whole thing may sound overkill, but for large-scale chat archives
+# and metadata workflows, it’s a lifesaver.
+# ─────────────────────────────────────────────────────────────────────────────
+
 
 def hash_message(message: str) -> str:
     """
