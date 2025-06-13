@@ -1,12 +1,13 @@
 import sys
 
-import path_utils
 from loguru import logger
+
+from backend.utils.path_utils import get_paths
 
 
 class LoggerSetup:
     # Retrieve the log file path once to be reused.
-    LOG_FILE = path_utils.get_paths().log_file
+    LOG_FILE = get_paths().log_file
 
     @staticmethod
     def configure_logger() -> None:
