@@ -56,9 +56,13 @@ class MessageMetadata:
     cur_id: str
     parent_id: str | None
     children_ids: List[str]
-    timestamp: str | None
+    timestamp: float | str | None
     # TODO : CHANGE THE TIMESTAMP TO HANDLE FLOATS,
     # AND PROPAGATE IT THROUGH THE PIPELINE
+    # A PRIORI IS DONE AS IS,
+    # NEED TO DEBUG FOR POSSIBLE UNEXPECTED BEHAVIOR IN DATABASE,
+    # TODO : CONSIDER CONVERTING THE NONE TIMESTAMP TO THE 0.0 FLOAT VALUE FOR CONSISTENCY,
+    # OR A BOOL.
 
     def to_dict(self) -> Dict[str, Union[str, int, float, bool]]:
         """
@@ -168,6 +172,7 @@ class ConversationParser:
             timestamp = message[JSONKeys.TIMESTAMP.value]
             if timestamp != "None":
                 logger.trace(f"Message timestamp found: {timestamp}")
+                timestamp = float(timestamp)
         except KeyError as e:
             logger.error(f"""Missing key in message author or timestamp: {e}.
                          Faulty message data: {message_data}
