@@ -170,7 +170,7 @@ class ConversationParser:
         try:
             role = message[JSONKeys.AUTHOR.value][JSONKeys.ROLE.value]
             timestamp = message[JSONKeys.TIMESTAMP.value]
-            if timestamp != "None":
+            if timestamp is not None:
                 logger.trace(f"Message timestamp found: {timestamp}")
                 timestamp = float(timestamp)
         except KeyError as e:
