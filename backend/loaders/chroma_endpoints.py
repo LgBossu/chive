@@ -90,9 +90,21 @@ class UpsertableMessages:
         :param message: The ParsedMessage instance to cast
         :return: A dictionary containing the message ID, content, and metadata
         """
+        # TODO : make the metadata a NamedTuple, or a TypedDict,
+        # essentially anything that requires every key to be present or something.
+        # For consistency, you know.
         message_id = hash_utils.hash_message(str(message))
+        logger.trace(f"Casting message: {message_id}")
+
         compatible_metadata = message.metadata.to_dict()
         compatible_metadata["conv_id"] = self.conversation_id
+        compatible_metadata["empty_or_non_text"] = (
+            message.content == "" or message.content == "[non-text content]"
+        )  # This is a boolean flag to indicate if the message is empty or non-text content.
+        # It's a workaround for the fact that ChromaDB does not support directly
+        # filtering out documents based on string equality.
+        # It also seems like document-based filtering is computationally expensive.
+
         return UpsertMessageArgs(
             ids=message_id,
             documents=message.content,
@@ -499,7 +511,7 @@ class ChromaCreator:
 
 
 if __name__ == "__main__":
-    from time import sleep
+    # from time import sleep
 
     from backend.utils.log_setup import LoggerSetup
 
@@ -517,34 +529,34 @@ if __name__ == "__main__":
                    Users stay advised.""")
 
     # Debug run
-    # QUICKLY QUERY THE DATABASE FOR A GIVEN TEXT INPUT
-    querier = ChromaQuerier()
-    query_text = None
+    # # QUICKLY QUERY THE DATABASE FOR A GIVEN TEXT INPUT
+    # querier = ChromaQuerier()
+    # query_text = None
 
-    if query_text is None:
-        query_text = str(
-            input("Enter the text to query against the ChromaDB messages collection: ")
-        )
+    # if query_text is None:
+    #     query_text = str(
+    #         input("Enter the text to query against the ChromaDB messages collection: ")
+    #     )
 
-    results = querier.quick_query(query_text=query_text)
+    # results = querier.quick_query(query_text=query_text)
 
-    for i, result in enumerate(results):
-        print(
-            "{color}[{rank:>3}]{uncolor} #BEGIN//{content}//END#\n".format(
-                color=ANSI_CYAN,
-                rank=i + 1,
-                uncolor=ANSI_RESET,
-                content=result,
-            )
-        )
-        sleep(0.05)  # Simulate some delay for better readability
-    logger.success("ChromaDB query process completed successfully.")
+    # for i, result in enumerate(results):
+    #     print(
+    #         "{color}[{rank:>3}]{uncolor} #BEGIN//{content}//END#\n".format(
+    #             color=ANSI_CYAN,
+    #             rank=i + 1,
+    #             uncolor=ANSI_RESET,
+    #             content=result,
+    #         )
+    #     )
+    #     sleep(0.05)  # Simulate some delay for better readability
+    # logger.success("ChromaDB query process completed successfully.")
 
-    # # CREATE A NEW CHROMADB PERSISTENT DATABASE
-    # creator = ChromaCreator()
-    # client = creator.create()
-    # upserter = ChromaUpserter(client=client)
-    # upserter.upsert_all_conversations()
-    # logger.info("ChromaDB upsert process completed successfully.")
-    # logger.info("You can now use the ChromaDB client to query or manipulate the data.")
-    # logger.info("ChromaDB client is ready for use.")
+    # CREATE A NEW CHROMADB PERSISTENT DATABASE
+    creator = ChromaCreator()
+    client = creator.create()
+    upserter = ChromaUpserter(client=client)
+    upserter.upsert_all_conversations()
+    logger.info("ChromaDB upsert process completed successfully.")
+    logger.info("You can now use the ChromaDB client to query or manipulate the data.")
+    logger.info("ChromaDB client is ready for use.")
