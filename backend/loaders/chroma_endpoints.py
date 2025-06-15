@@ -366,6 +366,12 @@ class ChromaQuerier:
         A quick query method that returns the most relevant messages
         from the ChromaDB messages collection in order.
 
+        Aims to query for NON-EMPTY messages only (not quite implemented yet).
+        Also queries for documents that are not `[non-text content]` (not implemented either).
+        # TODO : figure out these features.
+        # Likely, these cannot be achieved to excude based on text equalities, so empty strings and
+        # the like will likely have to be included in metadata, to filter them out efficiently.
+
         :param query_text: The text to query against the collection
         :param n_results: The number of results to return (default is 10)
         :return: The most relevant message from the collection
