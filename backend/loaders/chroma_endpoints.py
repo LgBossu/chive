@@ -299,8 +299,96 @@ class ChromaUpserter:
 
 
 class ChromaQuerier:
-    # TODO
-    pass
+    def __init__(self, client: Optional[chromadb.api.ClientAPI] = None) -> None:
+        """
+        Initialize the ChromaQuerier with the ChromaDB client and collections.
+
+        The database path is retrieved, checked for existence,
+        and the client instantiated AT RUNTIME.
+        """
+        if client is None:
+            client = connect()
+
+        self.client = client
+
+        self.conv_collection_name = COLLECTIONS_NAMES.conversations
+        self.mess_collection_name = COLLECTIONS_NAMES.messages
+
+        self.conv_collection = self.client.get_collection(self.conv_collection_name)
+        self.mess_collection = self.client.get_collection(self.mess_collection_name)
+
+    def _fully_query(
+        self,
+        query_text: chromadb.Documents,
+        where_condition: Optional[chromadb.Where] = None,
+        where_document_condition: Optional[chromadb.WhereDocument] = None,
+        include: Optional[chromadb.Include] = None,
+        n_results: int = 100,
+    ) -> chromadb.QueryResult:
+        """
+        A flexible wrapper for querying the ChromaDB messages collection.
+
+        :param query_text: The text to query against the collection
+        :param where_condition: Optional condition to filter results
+        :param where_document_condition: Optional condition to filter documents
+        :param include: Optional include parameters for the query
+        :param n_results: Optional number of results to return
+        :return: The query result from the ChromaDB collection
+        """
+        logger.debug(f"Full querying for text: {query_text}")
+
+        if include is None:
+            res = self.mess_collection.query(
+                query_texts=query_text,
+                where=where_condition,
+                where_document=where_document_condition,
+                n_results=n_results,
+            )
+        else:
+            res = self.mess_collection.query(
+                query_texts=query_text,
+                where=where_condition,
+                where_document=where_document_condition,
+                include=include,
+                n_results=n_results,
+            )
+
+        logger.debug("Query completed successfully.")
+
+        return res
+
+    def quick_query(
+        self,
+        query_text: str | List[str],
+        n_results: int = 10,
+    ) -> List[str]:
+        """
+        A quick query method that returns the most relevant messages
+        from the ChromaDB messages collection in order.
+
+        :param query_text: The text to query against the collection
+        :param n_results: The number of results to return (default is 10)
+        :return: The most relevant message from the collection
+        """
+        if isinstance(query_text, str):
+            query_text = [query_text]
+
+        logger.debug(f"Quick querying for text: {query_text}")
+        query_res = self._fully_query(
+            query_text=query_text,
+            n_results=n_results,
+        )
+
+        results = []
+        if query_res["documents"] is None:
+            logger.error("No documents found for the given query.")
+            raise ValueError("No documents found for the given query.")
+
+        results.extend(query_res["documents"][0])
+        # It returns a list of lists, but since we query only one text,
+        # we take the first (and only) list.
+
+        return results
 
 
 class ChromaCreator:
@@ -405,9 +493,14 @@ class ChromaCreator:
 
 
 if __name__ == "__main__":
+    from time import sleep
+
     from backend.utils.log_setup import LoggerSetup
 
     LoggerSetup.configure_logger()
+
+    ANSI_CYAN = "\033[96m"
+    ANSI_RESET = "\033[0m"
 
     logger.info("Starting ChromaDB upsert process...")
     logger.warning("""You are running the ChromaDB upsert script directly.
@@ -418,10 +511,34 @@ if __name__ == "__main__":
                    Users stay advised.""")
 
     # Debug run
-    creator = ChromaCreator()
-    client = creator.create()
-    upserter = ChromaUpserter(client=client)
-    upserter.upsert_all_conversations()
-    logger.info("ChromaDB upsert process completed successfully.")
-    logger.info("You can now use the ChromaDB client to query or manipulate the data.")
-    logger.info("ChromaDB client is ready for use.")
+    # QUICKLY QUERY THE DATABASE FOR A GIVEN TEXT INPUT
+    querier = ChromaQuerier()
+    query_text = None
+
+    if query_text is None:
+        query_text = str(
+            input("Enter the text to query against the ChromaDB messages collection: ")
+        )
+
+    results = querier.quick_query(query_text=query_text)
+
+    for i, result in enumerate(results):
+        print(
+            "{color}[{rank:>3}]{uncolor} #BEGIN//{content}//END#\n".format(
+                color=ANSI_CYAN,
+                rank=i + 1,
+                uncolor=ANSI_RESET,
+                content=result,
+            )
+        )
+        sleep(0.05)  # Simulate some delay for better readability
+    logger.success("ChromaDB query process completed successfully.")
+
+    # # CREATE A NEW CHROMADB PERSISTENT DATABASE
+    # creator = ChromaCreator()
+    # client = creator.create()
+    # upserter = ChromaUpserter(client=client)
+    # upserter.upsert_all_conversations()
+    # logger.info("ChromaDB upsert process completed successfully.")
+    # logger.info("You can now use the ChromaDB client to query or manipulate the data.")
+    # logger.info("ChromaDB client is ready for use.")
