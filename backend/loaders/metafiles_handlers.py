@@ -27,7 +27,6 @@ def clean_tags(raw_tags_lists: List[str]) -> List[str]:
     all_tags = ";".join(raw_tags_lists)  # Join all tags into a single string
     all_tags = all_tags.split(";")  # Split by semicolon to get individual tags
     all_tags = [tag.strip() for tag in all_tags if tag.strip()]  # Clean up tags
-    all_tags = list(set(all_tags))  # Remove duplicates
 
     return all_tags if all_tags else [NO_TAGS_TAG]
 
@@ -133,12 +132,15 @@ class Linker(ABC):
 
         for empty_id in current_empty_messages:
             current_to_tags[str(empty_id)] = [EMPTY_TAG]
-        for current_message, current_id in current_messages:
+        for current_id, current_message in current_messages:
             current_message = str(current_message)
             current_id = str(current_id)
 
             tags = message_to_tags.get(current_message, None)
             if tags is None:
+                logger.trace(
+                    f"No tags found for message ID {current_id} with content: {current_message[:50]}..."  # noqa: E501
+                )
                 continue  # Skip if no tags found for the message, it will be tagged on future runs
                 # TODO : figure out why all non empty messages are not recognized and skipped.
             current_to_tags[current_id] = []
@@ -272,6 +274,8 @@ class LegacyLinker(Linker):
             # Add tags to the message
             message_to_tags[message].extend(all_tags)
 
+            message_to_tags[message] = list(set(message_to_tags[message]))  # Remove duplicates
+
         logger.debug(f"Linked tags to {len(message_to_tags)} unique text messages")
         return message_to_tags
 
@@ -318,12 +322,16 @@ if __name__ == "__main__":
     )
 
     logger.info("Running the legacy linker pipeline")
-    past_to_tags = legacy_linker.link_past_to_tags()
-    current_to_tags = legacy_linker.link_current_to_tags(past_to_tags)
+    current_to_tags = legacy_linker.pipeline()
+    # past_to_tags = legacy_linker.link_past_to_tags()
+    # current_to_tags = legacy_linker.link_current_to_tags(past_to_tags)
+    # current_messages, _ = legacy_linker.get_current_messages()
     logger.info("Legacy linker pipeline completed")
     logger.info("Current to tags mapping:")
-    with open("data/text_output_streams/past_to_tags_output.txt", "w") as f:
-        pprint(past_to_tags, stream=f)
     with open("data/text_output_streams/current_to_tags_output.txt", "w") as f:
         pprint(current_to_tags, stream=f)
+    # with open("data/text_output_streams/past_to_tags_output.txt", "w") as f:
+    #     pprint(past_to_tags, stream=f)
+    # with open("data/text_output_streams/current_messages_output.txt", "w") as f:
+    #     pprint(current_messages, stream=f)
     logger.info("Finished running the legacy linker")
