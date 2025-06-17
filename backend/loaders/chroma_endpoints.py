@@ -599,6 +599,8 @@ if __name__ == "__main__":
                    Users stay advised.""")
 
     # Debug run
+    # TODO : at some point, ask for user input to proceed OR remove the debug run script.
+
     # QUICKLY QUERY THE DATABASE FOR A GIVEN TEXT INPUT
     querier = ChromaQuerier()
     query_text = None

@@ -6,8 +6,9 @@ from typing import Dict, List, Tuple
 
 import chromadb
 import numpy as np
-from chroma_endpoints import ChromaQuerier
 from loguru import logger
+
+from backend.loaders.chroma_endpoints import ChromaQuerier
 
 BLACKLIST_TAG = "######"
 EMPTY_TAG = "##EMPTY##"
@@ -32,9 +33,10 @@ def clean_tags(raw_tags_lists: List[str]) -> List[str]:
 
 
 class Linker(ABC):
-    def __init__(self, past_db_path: str):
+    def __init__(self, past_db_path: str | Path):
         """Initialize the Linker with a path to the past database."""
-        self.past_db_path = Path(past_db_path)
+        if isinstance(past_db_path, str):
+            self.past_db_path = Path(past_db_path)
         assert self.past_db_path.exists(), f"Past database path {self.past_db_path} does not exist."
 
     @abstractmethod
@@ -140,17 +142,43 @@ class Linker(ABC):
 
         return current_to_tags
 
+    def pipeline(self) -> Dict[str, List[str]]:
+        """
+        Main pipeline method to link past messages to tags and return the mapping.
+
+        This method orchestrates the linking of past messages to tags and returns a dictionary
+        mapping message content to lists of tags.
+
+        :return: A dictionary mapping message content to lists of tags.
+        :rtype: Dict[str, List[str]]
+        """
+        logger.debug("Starting the linking pipeline")
+        message_to_tags = self.link_past_to_tags()
+        logger.debug("Linking current messages to tags")
+        current_to_tags = self.link_current_to_tags(message_to_tags)
+        logger.debug("Linking pipeline completed")
+        return current_to_tags
+
 
 class LegacyLinker(Linker):
-    def __init__(self, legacy_db_path: str, legacy_metafiles_path: Tuple[str, str]):
+    def __init__(
+        self,
+        legacy_db_path: str | Path,
+        legacy_metafiles_path: Tuple[str, str] | Tuple[Path, Path],
+    ) -> None:
         # Legacy metafile is a pair of CSV files, not a proper database.
         # first string is the path to the CSV file with tags, second is the blacklist
         super().__init__(legacy_db_path)
 
-        self.legacy_metafiles_path = (
-            Path(legacy_metafiles_path[0]),
-            Path(legacy_metafiles_path[1]),
-        )
+        if isinstance(legacy_metafiles_path[0], str):
+            legacy_metafiles_path = (Path(legacy_metafiles_path[0]), Path(legacy_metafiles_path[1]))
+        self.legacy_metafiles_path = legacy_metafiles_path
+        assert (
+            isinstance(self.legacy_metafiles_path[0], Path)
+            and isinstance(self.legacy_metafiles_path[1], Path)  # noqa: E501
+        ), (
+            "Legacy metafiles paths must be Path objects."
+        )  # Keeping the linter happy, for clarity and maintainability  # noqa: E501
 
         logger.debug(
             f"Initializing LegacyLinker with db_path: {self.past_db_path} and metafiles: {self.legacy_metafiles_path}"  # noqa: E501
@@ -183,7 +211,7 @@ class LegacyLinker(Linker):
 
         return np.array(legacy_taglist, dtype=str)
 
-    def link_past_tags(self) -> Dict[str, List[str]]:
+    def link_past_to_tags(self) -> Dict[str, List[str]]:
         """
         Link past tags to the past messages' document (raw text) content.
 
@@ -229,3 +257,41 @@ class MetafileWriter:
     """
 
     pass
+
+
+if __name__ == "__main__":
+    from pprint import pprint
+
+    from backend.utils.log_setup import LoggerSetup
+    from backend.utils.path_utils import get_paths
+
+    LoggerSetup.configure_logger()
+
+    logger.info("Starting Metafiles process...")
+    logger.warning("""You are running the metafiles handling script directly.
+                   This is intended for debugging purposes only.
+
+                   This script is not intended for production use.
+                   Users stay advised.""")
+
+    # Get paths from the environment variables
+    paths = get_paths()
+
+    legacy_chroma = paths.legacy_chroma_dir / "V1 postprocess_chroma"
+    legacy_metafiles = (paths.messages_categories, paths.blacklist_categories)
+
+    # Debug run
+    # TODO : at some point, ask for user input to proceed OR remove the debug run script.
+
+    # Example usage
+    legacy_linker = LegacyLinker(
+        legacy_db_path=legacy_chroma,
+        legacy_metafiles_path=legacy_metafiles,
+    )
+
+    logger.debug("Running the legacy linker pipeline")
+    current_to_tags = legacy_linker.pipeline()
+    logger.debug("Legacy linker pipeline completed")
+    logger.debug("Current to tags mapping:")
+    pprint(current_to_tags)
+    logger.debug("Finished running the legacy linker")
