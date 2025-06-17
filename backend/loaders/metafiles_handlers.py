@@ -13,6 +13,8 @@ BLACKLIST_TAG = "######"
 EMPTY_TAG = "##EMPTY##"
 NO_TAGS_TAG = "##NO_TAGS##"
 
+NOT_TAGGED = True
+
 
 def clean_tags(raw_tags_lists: List[str]) -> List[str]:
     """
@@ -71,7 +73,7 @@ class Linker(ABC):
         return np.array(past_messages, dtype=str), np.array(past_empty_messages, dtype=str)
 
     @abstractmethod
-    def link_past_tags(self) -> Dict[str, List[str]]:
+    def link_past_to_tags(self) -> Dict[str, List[str]]:
         """
         Link past tags to the past messages' document (raw text) content.
 
@@ -80,6 +82,63 @@ class Linker(ABC):
         - The value is a list of tags associated with that message.
         """
         pass
+
+    def get_current_messages(self) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Get current messages from the database.
+
+        This method retrieves all messages from the current database, which is expected to be
+        a ChromaDB collection.
+
+        :return: A 2D numpy array with message IDs and content.
+        :rtype: np.ndarray
+        """
+        logger.debug("Connecting to the current database")
+        current_querier = ChromaQuerier()
+
+        logger.debug("Fetching current messages from the database")
+        current_nonempty_messages = current_querier.get_all_nonempty_messages()
+        current_empty_messages = current_querier.get_all_empty_messages()
+        logger.debug(f"Fetched {len(current_nonempty_messages)} current non-empty messages")
+        logger.debug(f"Fetched {len(current_empty_messages)} current empty messages")
+        if len(current_nonempty_messages) == 0:
+            logger.error("No current messages found in the database.")
+            raise ValueError("No current messages found in the database.")
+
+        return (
+            np.array(current_nonempty_messages, dtype=str),
+            np.array(current_empty_messages, dtype=str),
+        )
+
+    def link_current_to_tags(self, message_to_tags: Dict[str, List[str]]) -> Dict[str, List[str]]:
+        """
+        Link current messages to tags.
+
+        This method takes a dictionary mapping message content to lists of tags
+        and returns a dictionary where the keys are message IDs and the values are lists of tags
+        associated with those messages.
+
+        :param message_to_tags: A dictionary mapping message content to lists of tags.
+        :return: A dictionary mapping message IDs to lists of tags.
+        :rtype: Dict[str, List[str]]
+        """
+        current_to_tags: Dict[str, List[str]] = dict()
+
+        current_messages, current_empty_messages = self.get_current_messages()
+
+        for empty_id in current_empty_messages:
+            current_to_tags[str(empty_id)] = [EMPTY_TAG]
+        for current_message, current_id in current_messages:
+            current_message = str(current_message)
+            current_id = str(current_id)
+
+            tags = message_to_tags.get(current_message, None)
+            if tags is None:
+                continue  # Skip if no tags found for the message, it will be tagged on future runs
+            current_to_tags[current_id] = []
+            current_to_tags[current_id].extend(tags.copy())
+
+        return current_to_tags
 
 
 class LegacyLinker(Linker):
@@ -125,7 +184,17 @@ class LegacyLinker(Linker):
         return np.array(legacy_taglist, dtype=str)
 
     def link_past_tags(self) -> Dict[str, List[str]]:
-        """Link past tags to the past messages' document (raw text) content."""
+        """
+        Link past tags to the past messages' document (raw text) content.
+
+        This method reads the legacy metafiles, processes the tags, and returns a dictionary
+        where the keys are message contents and the values are lists of tags associated with those
+        messages.
+
+        :return: A dictionary mapping message content to lists of tags.
+        :rtype: Dict[str, List[str]]
+        :raises ValueError: If no past messages are found in the database.
+        """
         logger.debug("Linking past tags to past messages")
         taglist = self.get_taglist()
         past_messages, _ = self.get_past_messages()
@@ -147,5 +216,16 @@ class LegacyLinker(Linker):
             # Add tags to the message
             message_to_tags[message].extend(all_tags)
 
-        logger.debug(f"Linked tags to {len(message_to_tags)} messages")
+        logger.debug(f"Linked tags to {len(message_to_tags)} unique text messages")
         return message_to_tags
+
+
+class MetafileWriter:
+    """
+    Class to handle generating and writing the new metafile contents.
+
+    This class is responsible for creating the metafile content based on the linked tags
+    and writing it to the proper database.
+    """
+
+    pass
