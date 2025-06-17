@@ -478,6 +478,21 @@ class ChromaQuerier:
 
         return np.array(ids_list, dtype=str)
 
+    def count_collections(self) -> Dict[str, int]:
+        """
+        Count the number of documents in each collection.
+
+        :return: A dictionary with collection names as keys and their document counts as values.
+        :rtype: Dict[str, int]
+        """
+        logger.debug("Counting documents in each ChromaDB collection.")
+        counts = {
+            self.conv_collection_name: self.conv_collection.count(),
+            self.mess_collection_name: self.mess_collection.count(),
+        }
+        logger.debug(f"Document counts: {counts}")
+        return counts
+
 
 class ChromaCreator:
     """
@@ -601,28 +616,37 @@ if __name__ == "__main__":
     # Debug run
     # TODO : at some point, ask for user input to proceed OR remove the debug run script.
 
-    # QUICKLY QUERY THE DATABASE FOR A GIVEN TEXT INPUT
+    # CHECK THE CURRENT COLLECTIONS' LENGTHS
     querier = ChromaQuerier()
-    query_text = None
+    counts = querier.count_collections()
+    logger.info("Current collections' lengths:")
+    for collection_name, count in counts.items():
+        logger.info(f"{collection_name}: {count} documents")
+    logger.info("You can now use the ChromaDB client to query or manipulate the data.")
+    logger.info("ChromaDB client is ready for use.")
 
-    if query_text is None:
-        query_text = str(
-            input("Enter the text to query against the ChromaDB messages collection: ")
-        )
+    # # QUICKLY QUERY THE DATABASE FOR A GIVEN TEXT INPUT
+    # querier = ChromaQuerier()
+    # query_text = None
 
-    results = querier.quick_query(query_text=query_text)
+    # if query_text is None:
+    #     query_text = str(
+    #         input("Enter the text to query against the ChromaDB messages collection: ")
+    #     )
 
-    for i, result in enumerate(results):
-        print(
-            "{color}[{rank:>3}]{uncolor} {content}\n".format(
-                color=ANSI_CYAN,
-                rank=i + 1,
-                uncolor=ANSI_RESET,
-                content=result,
-            )
-        )
-        sleep(0.05)  # Simulate some delay for better readability
-    logger.success("ChromaDB query process completed successfully.")
+    # results = querier.quick_query(query_text=query_text)
+
+    # for i, result in enumerate(results):
+    #     print(
+    #         "{color}[{rank:>3}]{uncolor} {content}\n".format(
+    #             color=ANSI_CYAN,
+    #             rank=i + 1,
+    #             uncolor=ANSI_RESET,
+    #             content=result,
+    #         )
+    #     )
+    #     sleep(0.05)  # Simulate some delay for better readability
+    # logger.success("ChromaDB query process completed successfully.")
 
     # # CREATE A NEW CHROMADB PERSISTENT DATABASE
     # creator = ChromaCreator()
