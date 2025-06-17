@@ -142,7 +142,6 @@ class Linker(ABC):
                     f"No tags found for message ID {current_id} with content: {current_message[:50]}..."  # noqa: E501
                 )
                 continue  # Skip if no tags found for the message, it will be tagged on future runs
-                # TODO : figure out why all non empty messages are not recognized and skipped.
             current_to_tags[current_id] = []
             current_to_tags[current_id].extend(tags.copy())
 
