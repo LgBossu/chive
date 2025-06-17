@@ -15,6 +15,7 @@ env_loaded = load_dotenv(dotenv_path=paths_env)
 logger.debug(f"load_dotenv output: {env_loaded}")
 
 # Use a module-level constant for the session timestamp to ensure a static log file per execution.
+# Loaded at first import, then cached for the duration of the session.
 SESSION_TIMESTAMP = time()
 
 
@@ -23,9 +24,10 @@ class Paths:
     source_conversations_path: Path
     log_file: Path
     chroma_db_path: Path
+    metafiles_dir: Path
     small_model_path: Path
-    messages_categories: Path
-    blacklist_categories: Path
+    messages_categories: Path  # TO DEPRECATE
+    blacklist_categories: Path  # TO DEPRECATE
 
 
 def get_paths() -> Paths:
@@ -35,9 +37,10 @@ def get_paths() -> Paths:
         # Use SESSION_TIMESTAMP so the filename is static during the session.
         log_file=Path(os.environ["LOG_PATH"].format(time=SESSION_TIMESTAMP)),
         chroma_db_path=Path(os.environ["PERSISTENT_CHROMADB_PATH"]),
+        metafiles_dir=Path(os.environ["METAFILES_DIR_PATH"]),
         small_model_path=Path(os.environ["SMALL_LLM_MODEL_PATH"]),
-        messages_categories=Path(os.environ["MESSAGES_CATEGORIES"]),
-        blacklist_categories=Path(os.environ["BLACKLIST_CATEGORIES"]),
+        messages_categories=Path(os.environ["MESSAGES_CATEGORIES"]),  # TO DEPRECATE
+        blacklist_categories=Path(os.environ["BLACKLIST_CATEGORIES"]),  # TO DEPRECATE
     )
 
 
