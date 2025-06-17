@@ -1,4 +1,5 @@
 import sys
+from typing import Optional
 
 from loguru import logger
 
@@ -10,11 +11,13 @@ class LoggerSetup:
     LOG_FILE = get_paths().log_file
 
     @staticmethod
-    def configure_logger() -> None:
+    def configure_logger(console_level: Optional[str] = None) -> None:
         """
         Set up loguru logger with a console and a file sink.
         This should be called once in the application's lifetime.
         """
+        if console_level not in ["TRACE", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]:
+            console_level = "INFO"
         # Remove any default loggers to prevent duplicate logs.
         logger.remove()
 
@@ -22,7 +25,7 @@ class LoggerSetup:
         logger.add(
             sink=sys.stdout,
             format="<level>{level:<10} | {message}</>",
-            level="INFO",
+            level=console_level,
             colorize=True,
         )
 
