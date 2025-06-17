@@ -318,9 +318,12 @@ if __name__ == "__main__":
     )
 
     logger.info("Running the legacy linker pipeline")
-    current_to_tags = legacy_linker.pipeline()
+    past_to_tags = legacy_linker.link_past_to_tags()
+    current_to_tags = legacy_linker.link_current_to_tags(past_to_tags)
     logger.info("Legacy linker pipeline completed")
     logger.info("Current to tags mapping:")
+    with open("data/text_output_streams/past_to_tags_output.txt", "w") as f:
+        pprint(past_to_tags, stream=f)
     with open("data/text_output_streams/current_to_tags_output.txt", "w") as f:
         pprint(current_to_tags, stream=f)
     logger.info("Finished running the legacy linker")
