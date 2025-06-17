@@ -6,6 +6,8 @@ from typing import Dict, List, Mapping, NamedTuple, Optional, Set, Tuple, Union
 
 import chromadb
 import chromadb.api
+import chromadb.api.types
+import numpy as np
 from loguru import logger
 
 from backend.loaders.conversation_loader import ConversationLoader
@@ -16,6 +18,8 @@ from backend.utils.path_utils import get_paths
 Metadata = Mapping[
     str, Union[str, int, float, bool]
 ]  # Mimic chromadb.Metadata type for easier type hinting
+
+ChromaInclude = chromadb.api.types.IncludeEnum
 
 
 class UpsertMessageArgs(NamedTuple):
@@ -405,6 +409,74 @@ class ChromaQuerier:
         # we take the first (and only) list.
 
         return results
+
+    def get_all_nonempty_messages(self) -> np.ndarray:
+        """
+        Retrieve all messages from the ChromaDB messages collection.
+
+        This method filters out empty or non-text messages by checking the `empty_or_non_text`
+        metadata field.
+        It returns a 2D numpy array where the first column contains message IDs
+        and the second column contains the corresponding message content.
+
+        :return: A 2D numpy array with message IDs and content.
+
+                 - On the first coordinate, the message ID.
+                 - On the second coordinate, the message content.
+
+        :rtype: np.ndarray
+        :raises ValueError: If no documents are retrieved or if there is a mismatch
+            between the number of IDs and documents retrieved from the messages collection.
+        """
+        logger.debug("Retrieving all messages from the ChromaDB messages collection.")
+        query_res = self.mess_collection.get(
+            where={"empty_or_non_text": False},
+            include=[ChromaInclude.documents],
+        )
+
+        ids_list = query_res["ids"]
+        documents_list = query_res["documents"]
+        if documents_list is None:
+            logger.critical("No documents retrieved from messages collection.")
+            raise ValueError("No documents retrieved from messages collection.")
+        if len(ids_list) != len(documents_list):
+            logger.critical(
+                "Mismatch between number of IDs and documents retrieved from messages collection."
+            )
+            raise ValueError(
+                "Mismatch between number of IDs and documents retrieved from messages collection."
+            )
+
+        logger.debug(f"Retrieved {len(ids_list)} messages from the collection.")
+
+        # Create a 2D numpy array with IDs and documents
+        ids_arr = np.array(ids_list, dtype=str)
+        documents_arr = np.array(documents_list, dtype=str)
+        messages_array = np.column_stack((ids_arr, documents_arr))
+
+        return messages_array
+
+    def get_all_empty_messages(self) -> np.ndarray:
+        """
+        Retrieve all empty messages from the ChromaDB messages collection.
+
+        This method filters messages that are marked as empty or non-text content
+        by checking the `empty_or_non_text` metadata field.
+        It returns a 1D numpy array containing the IDs of the empty messages.
+
+        :return: A 1D numpy array with message IDs of empty messages.
+        :rtype: np.ndarray
+        """
+        logger.debug("Retrieving all empty messages from the ChromaDB messages collection.")
+        query_res = self.mess_collection.get(
+            where={"empty_or_non_text": True},
+            include=[],
+        )
+
+        ids_list = query_res["ids"]
+        logger.debug(f"Retrieved {len(ids_list)} empty messages from the collection.")
+
+        return np.array(ids_list, dtype=str)
 
 
 class ChromaCreator:
