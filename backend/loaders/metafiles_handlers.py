@@ -36,7 +36,8 @@ class Linker(ABC):
     def __init__(self, past_db_path: str | Path):
         """Initialize the Linker with a path to the past database."""
         if isinstance(past_db_path, str):
-            self.past_db_path = Path(past_db_path)
+            past_db_path = Path(past_db_path)
+        self.past_db_path = past_db_path
         assert self.past_db_path.exists(), f"Past database path {self.past_db_path} does not exist."
 
     @abstractmethod
@@ -59,6 +60,8 @@ class Linker(ABC):
         :rtype: Tuple[np.ndarray, np.ndarray]
         :raises ValueError: If no past messages are found in the database.
         """
+        # TODO : refactor to bypass empty message querying,
+        # as it is not used in the current implementation.
         logger.debug("Connecting to the past database")
         client = chromadb.PersistentClient(path=str(self.past_db_path))
 
@@ -137,8 +140,12 @@ class Linker(ABC):
             tags = message_to_tags.get(current_message, None)
             if tags is None:
                 continue  # Skip if no tags found for the message, it will be tagged on future runs
+                # TODO : figure out why all non empty messages are not recognized and skipped.
             current_to_tags[current_id] = []
             current_to_tags[current_id].extend(tags.copy())
+
+        logger.debug(f"Linked {len(current_to_tags)} current messages to tags")
+        logger.debug(f"Among these, {len(current_empty_messages)} are likely empty messages")
 
         return current_to_tags
 
@@ -152,11 +159,12 @@ class Linker(ABC):
         :return: A dictionary mapping message content to lists of tags.
         :rtype: Dict[str, List[str]]
         """
-        logger.debug("Starting the linking pipeline")
+        logger.info("Starting the linking pipeline")
+        logger.info("Linking past messages to tags")
         message_to_tags = self.link_past_to_tags()
-        logger.debug("Linking current messages to tags")
+        logger.info("Linking current messages to tags")
         current_to_tags = self.link_current_to_tags(message_to_tags)
-        logger.debug("Linking pipeline completed")
+        logger.info("Linking pipeline completed")
         return current_to_tags
 
 
@@ -203,13 +211,33 @@ class LegacyLinker(Linker):
         with open(self.legacy_metafiles_path[0], "r") as tagfile:
             csv_reader = reader(tagfile, delimiter=",")
             for row in csv_reader:
-                legacy_taglist.append(row)
+                legacy_taglist.append(
+                    [row[0], ";".join(row[1:])]
+                )  # If parasitic "," separator after second column, just concatenate to the rest
         with open(self.legacy_metafiles_path[1], "r") as blacklistfile:
             for line in blacklistfile:
                 legacy_taglist.append([line[:-1], BLACKLIST_TAG])
                 # Remove newline character and add a specific tag for blacklisted items
 
         return np.array(legacy_taglist, dtype=str)
+
+    def get_past_messages(self) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Legacy override for previous databases that did not include an empty_messages metadata flag.
+        """
+        client = chromadb.PersistentClient(path=str(self.past_db_path))
+        collection = client.get_collection("messages")  # TODO : do not hardcode, inelegant,
+        # although legacy database has a consistent naming scheme.
+        logger.debug("Fetching past messages from the legacy database")
+        past_messages_get = collection.get(include=["documents"])  # type: ignore
+        past_messages_ids = np.array(past_messages_get["ids"], dtype=str)
+        past_messages_docs = np.array(past_messages_get["documents"], dtype=str)
+        past_messages = np.column_stack((past_messages_docs, past_messages_ids))
+        logger.debug(f"Fetched {len(past_messages)} past messages from the legacy database")
+
+        past_empty_messages = np.array([], dtype=str)  # Legacy databases do not have empty messages
+
+        return past_messages, past_empty_messages
 
     def link_past_to_tags(self) -> Dict[str, List[str]]:
         """
@@ -265,7 +293,7 @@ if __name__ == "__main__":
     from backend.utils.log_setup import LoggerSetup
     from backend.utils.path_utils import get_paths
 
-    LoggerSetup.configure_logger()
+    LoggerSetup.configure_logger(console_level="DEBUG")
 
     logger.info("Starting Metafiles process...")
     logger.warning("""You are running the metafiles handling script directly.
@@ -289,9 +317,10 @@ if __name__ == "__main__":
         legacy_metafiles_path=legacy_metafiles,
     )
 
-    logger.debug("Running the legacy linker pipeline")
+    logger.info("Running the legacy linker pipeline")
     current_to_tags = legacy_linker.pipeline()
-    logger.debug("Legacy linker pipeline completed")
-    logger.debug("Current to tags mapping:")
-    pprint(current_to_tags)
-    logger.debug("Finished running the legacy linker")
+    logger.info("Legacy linker pipeline completed")
+    logger.info("Current to tags mapping:")
+    with open("data/text_output_streams/current_to_tags_output.txt", "w") as f:
+        pprint(current_to_tags, stream=f)
+    logger.info("Finished running the legacy linker")
