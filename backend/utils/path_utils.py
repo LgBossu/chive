@@ -28,6 +28,7 @@ class Paths:
     small_model_path: Path
     messages_categories: Path  # TO DEPRECATE
     blacklist_categories: Path  # TO DEPRECATE
+    legacy_chroma_dir: Path
 
 
 def get_paths() -> Paths:
@@ -39,8 +40,9 @@ def get_paths() -> Paths:
         chroma_db_path=Path(os.environ["PERSISTENT_CHROMADB_PATH"]),
         metafiles_dir=Path(os.environ["METAFILES_DIR_PATH"]),
         small_model_path=Path(os.environ["SMALL_LLM_MODEL_PATH"]),
-        messages_categories=Path(os.environ["MESSAGES_CATEGORIES"]),  # TO DEPRECATE
-        blacklist_categories=Path(os.environ["BLACKLIST_CATEGORIES"]),  # TO DEPRECATE
+        messages_categories=Path(os.environ["CSV_LEGACY_MESSAGES_CATEGORIES"]),  # TO DEPRECATE
+        blacklist_categories=Path(os.environ["CSV_LEGACY_BLACKLIST_CATEGORIES"]),  # TO DEPRECATE
+        legacy_chroma_dir=Path(os.environ["LEGACY_CHROMA_DIR"]),
     )
 
 
