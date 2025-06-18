@@ -21,28 +21,46 @@ SESSION_TIMESTAMP = time()
 
 @dataclass(frozen=True)
 class Paths:
-    source_conversations_path: Path
+    # Logging file path
     log_file: Path
+    # Current source, db, metafiles
+    source_conversations_path: Path
     chroma_db_path: Path
     metafiles_dir: Path
+    # Legacy paths
+    legacy_chroma_dir: Path
+    metafiles_legacy_dir: Path
+    # Metafiles directory navigation
+    dynamic_tags_db: Path
+    # LLM model path
     small_model_path: Path
+    # REALLY legacy version, to be deprecated when backend relies on sqlite db.
+    # These paths are used for legacy CSV files and should be removed in the future.
     messages_categories: Path  # TO DEPRECATE
     blacklist_categories: Path  # TO DEPRECATE
-    legacy_chroma_dir: Path
 
 
 def get_paths() -> Paths:
     logger.debug("Summoned get_paths")
     return Paths(
-        source_conversations_path=Path(os.environ["SOURCE_JSON_PATH"]),
         # Use SESSION_TIMESTAMP so the filename is static during the session.
         log_file=Path(os.environ["LOG_PATH"].format(time=SESSION_TIMESTAMP)),
+        # Source, db, metafiles
+        source_conversations_path=Path(os.environ["SOURCE_JSON_PATH"]),
         chroma_db_path=Path(os.environ["PERSISTENT_CHROMADB_PATH"]),
         metafiles_dir=Path(os.environ["METAFILES_DIR_PATH"]),
+        # Legacy paths
+        metafiles_legacy_dir=Path(os.environ["METAFILES_LEGACY_DIR"]),
+        legacy_chroma_dir=Path(os.environ["LEGACY_CHROMA_DIR"]),
+        # Metafiles directory navigation
+        dynamic_tags_db=(
+            Path(os.environ["METAFILES_DIR_PATH"]) / Path(os.environ["DYNAMIC_TAGS_DB"])
+        ),
+        # LLM model path
         small_model_path=Path(os.environ["SMALL_LLM_MODEL_PATH"]),
+        # Soon to be deprecated paths
         messages_categories=Path(os.environ["CSV_LEGACY_MESSAGES_CATEGORIES"]),  # TO DEPRECATE
         blacklist_categories=Path(os.environ["CSV_LEGACY_BLACKLIST_CATEGORIES"]),  # TO DEPRECATE
-        legacy_chroma_dir=Path(os.environ["LEGACY_CHROMA_DIR"]),
     )
 
 
