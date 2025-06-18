@@ -544,7 +544,8 @@ if __name__ == "__main__":
     #     """
     # ).fetchall()
     logger.info("Dynamic tags database content:")
-    pprint(dynamic_tags)
+    with open("data/text_output_streams/dynamic_tags_output.txt", "w") as f:
+        pprint(dynamic_tags, stream=f)
     metafile_writer = None
     logger.info("MetafileWriter set to None.")
     logger.info("Exiting the script.")
