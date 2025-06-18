@@ -9,7 +9,13 @@ import numpy as np
 from loguru import logger
 
 from backend.loaders.chroma_endpoints import ChromaQuerier
+from backend.utils.path_utils import get_paths
 
+# TODO : deeply analyze this module for potential memory leaks on linking operations.
+# Up to estimated 8GB of RAM usage is measured on system monitor :
+# Verify if this is due to module level manipulation, design issues, or other factors.
+
+# Constant tags literals
 BLACKLIST_TAG = "######"
 EMPTY_TAG = "##EMPTY##"
 NO_TAGS_TAG = "##NO_TAGS##"
@@ -287,12 +293,138 @@ class MetafileWriter:
     and writing it to the proper database.
     """
 
+    def __init__(self, creation_mode: bool = False) -> None:
+        """
+        Initialize the MetafileWriter.
+
+        :param creation_mode: If True, expects to work on a new database.
+                              If False, expects to append to an existing database.
+        """
+        self.creation_mode = creation_mode
+        self.dynamic_tags_db = get_paths().dynamic_tags_db
+
+        if self.dynamic_tags_db.exists() == self.creation_mode:
+            logger.debug("Creation mode mismatch with dynamic tags database existence.")
+            # If creation mode is True, the database should not exist.
+            # If creation mode is False, the database should exist.
+            if self.creation_mode:
+                logger.error(
+                    f"Dynamic tags database {self.dynamic_tags_db} already exists, but creation mode is set to True."  # noqa: E501
+                )
+                raise FileExistsError(
+                    f"Dynamic tags database at {self.dynamic_tags_db} already exists."
+                )
+            else:
+                logger.error(
+                    f"Dynamic tags database {self.dynamic_tags_db} does not exist, but creation mode is set to False."  # noqa: E501
+                )
+                raise FileNotFoundError(
+                    f"Dynamic tags database at {self.dynamic_tags_db} does not exist."
+                )
+        else:
+            self.sqlite_connection = sqlite3.connect(self.dynamic_tags_db)
+            self.sqlite_cursor = self.sqlite_connection.cursor()
+            logger.info(f"Connected to dynamic tags database at {self.dynamic_tags_db}")
+
+    def create_dynamic_tags_table(self) -> None:
+        """
+        Create the dynamic tags table in the database.
+
+        This method creates a table with the following structure:
+        - id: `INTEGER` `PRIMARY KEY` `AUTOINCREMENT` (automatic, not accessed, is part of the virtual table structure)
+        - message_id: `TEXT`
+        - tags: `TEXT`
+        """  # noqa: E501
+        assert self.creation_mode, "Cannot create dynamic tags table in non-creation mode."
+        logger.info("Creating dynamic tags table in the database")
+        # Create the dynamic_tags table with FTS5 for full-text search capabilities
+        self.sqlite_cursor.execute(
+            """CREATE VIRTUAL TABLE dynamic_tags USING fts5(message_id, tags);"""
+        )
+        self.sqlite_connection.commit()
+        logger.info("Dynamic tags table created successfully")
+
+    def write_single_tagline(
+        self,
+        message_id: str,
+        tags: List[str],
+    ) -> None:
+        """
+        Write a single tagline to the dynamic tags database.
+
+        :param message_id: The ID of the message.
+        :param tags: A list of tags associated with the message.
+        """
+        # Join tags into a single string
+        tags.sort()  # Sort tags for consistency
+        # TODO : document somewhere that tags are sorted in alphabetical order
+        # before being written to database
+        tags_str = ";".join(tags)
+        self.sqlite_cursor.execute(
+            "INSERT INTO dynamic_tags (message_id, tags) VALUES (?, ?);",
+            (message_id, tags_str),
+        )
+        self.sqlite_connection.commit()
+        logger.debug(f"Tags for message ID {message_id} written successfully")
+
+    def write_tags_dict(self, current_to_tags: Dict[str, List[str]]) -> None:
+        """
+        Write a dictionary of message IDs to tags into the dynamic tags database.
+
+        :param current_to_tags: A dictionary mapping message IDs to lists of tags.
+        """
+        if not self.creation_mode:
+            logger.error(
+                "In current version, mass writing is assumed to be creation mode exclusive. Are you sure of what you are doing?"  # noqa: E501
+            )
+            raise RuntimeError(
+                "Mass writing to the dynamic tags database is only allowed in creation mode."
+            )
+
+        logger.info("Writing tags to the dynamic tags database")
+
+        # Prepare data for executemany: sort tags and join them into a string
+        tag_rows = [
+            (message_id, ";".join(sorted(tags))) for message_id, tags in current_to_tags.items()
+        ]
+        # Insert all tags into the dynamic_tags table
+        self.sqlite_cursor.executemany(
+            "INSERT INTO dynamic_tags (message_id, tags) VALUES (?, ?);",
+            tag_rows,
+        )
+        logger.debug(f"Inserted {len(tag_rows)} tag rows into the dynamic tags database")
+        # Commit the changes to the database
+        self.sqlite_connection.commit()
+        logger.info("All tags written to the dynamic tags database successfully")
+
+    def close_dynamic_tags_db(self) -> None:
+        """
+        Close the connection to the dynamic tags database.
+
+        This method should be called when the writer is no longer needed.
+        """
+        if self.sqlite_connection:
+            self.sqlite_connection.close()
+            logger.info("Dynamic tags database connection closed")
+        else:
+            logger.warning("Dynamic tags database connection was already closed")
+
+    def __del__(self):
+        """
+        Destructor to ensure the database connection is closed when the object is deleted.
+        """
+        self.close_dynamic_tags_db()
+        logger.warning(
+            f"MetafileWriter instance {self.__repr__()} deleted, database connection closed"
+        )
+
+
+class MetafileQuerier:
+    # TODO : docstring. And also all the rest.
     pass
 
 
 if __name__ == "__main__":
-    from pprint import pprint
-
     from backend.utils.log_setup import LoggerSetup
     from backend.utils.path_utils import get_paths
 
@@ -301,6 +433,9 @@ if __name__ == "__main__":
     logger.info("Starting Metafiles process...")
     logger.warning("""You are running the metafiles handling script directly.
                    This is intended for debugging purposes only.
+
+                   The script IS SUSCPTIBLE to write, read, and modify actual databases.
+                   It is not recommended to run this script in production environments.
 
                    This script is not intended for production use.
                    Users stay advised.""")
@@ -314,23 +449,66 @@ if __name__ == "__main__":
     # Debug run
     # TODO : at some point, ask for user input to proceed OR remove the debug run script.
 
-    # Example usage
-    legacy_linker = LegacyLinker(
-        legacy_db_path=legacy_chroma,
-        legacy_metafiles_path=legacy_metafiles,
-    )
+    # # TEST THE LEGACY LINKER'S BEHAVIOR
+    # from pprint import pprint
 
-    logger.info("Running the legacy linker pipeline")
-    current_to_tags = legacy_linker.pipeline()
-    # past_to_tags = legacy_linker.link_past_to_tags()
-    # current_to_tags = legacy_linker.link_current_to_tags(past_to_tags)
-    # current_messages, _ = legacy_linker.get_current_messages()
-    logger.info("Legacy linker pipeline completed")
-    logger.info("Current to tags mapping:")
-    with open("data/text_output_streams/current_to_tags_output.txt", "w") as f:
-        pprint(current_to_tags, stream=f)
-    # with open("data/text_output_streams/past_to_tags_output.txt", "w") as f:
-    #     pprint(past_to_tags, stream=f)
-    # with open("data/text_output_streams/current_messages_output.txt", "w") as f:
-    #     pprint(current_messages, stream=f)
-    logger.info("Finished running the legacy linker")
+    # legacy_linker = LegacyLinker(
+    #     legacy_db_path=legacy_chroma,
+    #     legacy_metafiles_path=legacy_metafiles,
+    # )
+
+    # logger.info("Running the legacy linker pipeline")
+    # current_to_tags = legacy_linker.pipeline()
+    # logger.info("Legacy linker pipeline completed")
+    # logger.info("Current to tags mapping:")
+    # with open("data/text_output_streams/current_to_tags_output.txt", "w") as f:
+    #     pprint(current_to_tags, stream=f)
+    # logger.info("Finished running the legacy linker")
+
+    # # TEST THE METAFILE WRITER'S BEHAVIOR
+    # legacy_linker = LegacyLinker(
+    #     legacy_db_path=legacy_chroma,
+    #     legacy_metafiles_path=legacy_metafiles,
+    # )
+
+    # logger.info("Running the legacy linker pipeline")
+    # current_to_tags = legacy_linker.pipeline()
+    # logger.info("Legacy linker pipeline completed")
+
+    # metafile_writer = MetafileWriter(creation_mode=True)
+    # logger.info("Creating dynamic tags table")
+    # metafile_writer.create_dynamic_tags_table()
+    # logger.info("Writing tags to the dynamic tags database")
+    # metafile_writer.write_tags_dict(current_to_tags)
+    # logger.info("Finished writing tags to the dynamic tags database")
+    # logger.info("Metafiles process completed successfully.")
+    # print(metafile_writer.sqlite_cursor.execute("SELECT * FROM dynamic_tags;").fetchmany(10))
+    # metafile_writer = None
+    # # Explicitly delete the metafile writer instance to trigger the GC and destructor
+    # # Check if the destructor is called and the database connection is closed
+    # logger.info("MetafileWriter instance deleted, database connection should be closed now.")
+    # logger.info("Exiting the script.")
+
+    # JUST PEEK INTO THE DYNAMIC TAGS DATABASE
+    from pprint import pprint
+
+    metafile_writer = MetafileWriter(creation_mode=False)
+    logger.info("Peeking into the dynamic tags database")
+    dynamic_tags = metafile_writer.sqlite_cursor.execute(
+        """SELECT *
+        FROM dynamic_tags
+        WHERE tags NOT LIKE 'none';"""
+    ).fetchall()
+    # # Query for tags that start with '##' and end with '##' (whatever in the middle)
+    # dynamic_tags = metafile_writer.sqlite_cursor.execute(
+    #     """
+    #     SELECT *
+    #     FROM dynamic_tags
+    #     WHERE tags GLOB '##*##';
+    #     """
+    # ).fetchall()
+    logger.info("Dynamic tags database content:")
+    pprint(dynamic_tags)
+    metafile_writer = None
+    logger.info("MetafileWriter set to None.")
+    logger.info("Exiting the script.")
