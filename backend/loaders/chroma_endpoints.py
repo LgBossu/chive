@@ -596,8 +596,6 @@ class ChromaCreator:
 
 
 if __name__ == "__main__":
-    from time import sleep
-
     from backend.utils.log_setup import LoggerSetup
 
     LoggerSetup.configure_logger()
@@ -645,7 +643,6 @@ if __name__ == "__main__":
     #             content=result,
     #         )
     #     )
-    #     sleep(0.05)  # Simulate some delay for better readability
     # logger.success("ChromaDB query process completed successfully.")
 
     # # CREATE A NEW CHROMADB PERSISTENT DATABASE
