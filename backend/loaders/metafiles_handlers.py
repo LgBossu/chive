@@ -176,6 +176,25 @@ class Linker(ABC):
 
 
 class LegacyLinker(Linker):
+    """
+    LegacyLinker is a subclass of Linker that handles legacy metafiles
+    and links past messages to tags using a pair of CSV files.
+
+    It is designed to work with legacy databases that do not use the
+    modern ChromaDB structure.
+
+    **This class is intended to be used for legacy data migration and
+    CANNOT be used for new databases.**
+
+    It reads tags from a pair of CSV files, where the first file contains
+    message IDs and their associated tags, and the second file contains
+    blacklisted message IDs with a specific tag.
+    It provides methods to retrieve the taglist, fetch past messages,
+    and link past messages to tags.
+    """
+
+    # For now, I'm keeping this class in the codebase, in case. You know.
+
     def __init__(
         self,
         legacy_db_path: str | Path,
@@ -183,6 +202,9 @@ class LegacyLinker(Linker):
     ) -> None:
         # Legacy metafile is a pair of CSV files, not a proper database.
         # first string is the path to the CSV file with tags, second is the blacklist
+        raise NotImplementedError(
+            "This class was deprecated in favor of SQL-based metafiles handling."
+        )
         super().__init__(legacy_db_path)
 
         if isinstance(legacy_metafiles_path[0], str):
@@ -213,6 +235,9 @@ class LegacyLinker(Linker):
         :return: A 2D numpy array with message IDs and tags.
         :rtype: np.ndarray
         """
+        raise NotImplementedError(
+            "This class was deprecated in favor of SQL-based metafiles handling."
+        )
         logger.debug("Loading legacy taglist from metafiles")
         legacy_taglist = []
         with open(self.legacy_metafiles_path[0], "r") as tagfile:
@@ -232,6 +257,9 @@ class LegacyLinker(Linker):
         """
         Legacy override for previous databases that did not include an empty_messages metadata flag.
         """
+        raise NotImplementedError(
+            "This class was deprecated in favor of SQL-based metafiles handling."
+        )
         client = chromadb.PersistentClient(path=str(self.past_db_path))
         collection = client.get_collection("messages")  # TODO : do not hardcode, inelegant,
         # although legacy database has a consistent naming scheme.
@@ -258,6 +286,9 @@ class LegacyLinker(Linker):
         :rtype: Dict[str, List[str]]
         :raises ValueError: If no past messages are found in the database.
         """
+        raise NotImplementedError(
+            "This class was deprecated in favor of SQL-based metafiles handling."
+        )
         logger.debug("Linking past tags to past messages")
         taglist = self.get_taglist()
         past_messages, _ = self.get_past_messages()
@@ -420,7 +451,7 @@ class MetafileWriter:
 
 
 class MetafileQuerier:
-    # TODO : docstring. And also all the rest.
+    # TODO : docstring. And also implement all of it.
     pass
 
 
@@ -440,17 +471,17 @@ if __name__ == "__main__":
                    This script is not intended for production use.
                    Users stay advised.""")
 
-    # Get paths from the environment variables
-    paths = get_paths()
-
-    legacy_chroma = paths.legacy_chroma_dir / "V1 postprocess_chroma"
-    legacy_metafiles = (paths.messages_categories, paths.blacklist_categories)
-
     # Debug run
     # TODO : at some point, ask for user input to proceed OR remove the debug run script.
 
     # # TEST THE LEGACY LINKER'S BEHAVIOR
     # from pprint import pprint
+
+    # # Get paths from the environment variables
+    # paths = get_paths()
+
+    # legacy_chroma = paths.legacy_chroma_dir / "V1 postprocess_chroma"
+    # legacy_metafiles = (paths.messages_categories, paths.blacklist_categories)
 
     # legacy_linker = LegacyLinker(
     #     legacy_db_path=legacy_chroma,
@@ -470,6 +501,11 @@ if __name__ == "__main__":
     #     legacy_db_path=legacy_chroma,
     #     legacy_metafiles_path=legacy_metafiles,
     # )
+
+    # # Get paths from the environment variables
+    # paths = get_paths()
+    # legacy_chroma = paths.legacy_chroma_dir / "V1 postprocess_chroma"
+    # legacy_metafiles = (paths.messages_categories, paths.blacklist_categories)
 
     # logger.info("Running the legacy linker pipeline")
     # current_to_tags = legacy_linker.pipeline()

@@ -34,10 +34,6 @@ class Paths:
     dynamic_tags_db: Path
     # LLM model path
     small_model_path: Path
-    # REALLY legacy version, to be deprecated when backend relies on sqlite db.
-    # These paths are used for legacy CSV files and should be removed in the future.
-    messages_categories: Path  # TO DEPRECATE
-    blacklist_categories: Path  # TO DEPRECATE
 
 
 def get_paths() -> Paths:
@@ -58,9 +54,6 @@ def get_paths() -> Paths:
         ),
         # LLM model path
         small_model_path=Path(os.environ["SMALL_LLM_MODEL_PATH"]),
-        # Soon to be deprecated paths
-        messages_categories=Path(os.environ["CSV_LEGACY_MESSAGES_CATEGORIES"]),  # TO DEPRECATE
-        blacklist_categories=Path(os.environ["CSV_LEGACY_BLACKLIST_CATEGORIES"]),  # TO DEPRECATE
     )
 
 
