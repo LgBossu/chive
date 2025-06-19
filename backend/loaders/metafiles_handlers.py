@@ -459,9 +459,37 @@ class MetafileWriter:
         Destructor to ensure the database connection is closed when the object is deleted.
         """
         self.close_dynamic_tags_db()
-        logger.warning(
+        logger.info(
             f"MetafileWriter instance {self.__repr__()} deleted, database connection closed"
         )
+
+    def deduplicate_table(self) -> None:
+        """
+        Deduplicate the dynamic tags table by removing duplicate entries.
+
+        This method removes duplicate entries from the dynamic_tags table based on the message_id.
+        It keeps the first occurrence of each message_id and removes subsequent duplicates.
+        """
+        # TODO : understand why this method exectued so slowly, and optimize it.
+        logger.info("Deduplicating the dynamic tags table")
+        self.sqlite_cursor.execute(
+            """
+            DELETE FROM dynamic_tags
+            WHERE rowid NOT IN (
+                SELECT rowid
+                FROM dynamic_tags dt
+                WHERE rowid = (
+                    SELECT rowid
+                    FROM dynamic_tags
+                    WHERE message_id = dt.message_id
+                    ORDER BY LENGTH(tags) DESC, rowid ASC
+                    LIMIT 1
+                )
+            );
+            """
+        )
+        self.sqlite_connection.commit()
+        logger.info("Dynamic tags table deduplicated successfully")
 
 
 class MetafileQuerier:
@@ -487,6 +515,27 @@ class MetafileQuerier:
             ).fetchall()
         ]
         return tagged_ids
+
+    def close_dynamic_tags_db(self) -> None:
+        """
+        Close the connection to the dynamic tags database.
+
+        This method should be called when the querier is no longer needed.
+        """
+        if self.sqlite_connection:
+            self.sqlite_connection.close()
+            logger.info("Dynamic tags database connection closed")
+        else:
+            logger.warning("Dynamic tags database connection was already closed")
+
+    def __del__(self):
+        """
+        Destructor to ensure the database connection is closed when the object is deleted.
+        """
+        self.close_dynamic_tags_db()
+        logger.info(
+            f"MetafileQuerier instance {self.__repr__()} deleted, database connection closed"
+        )
 
 
 if __name__ == "__main__":
@@ -559,27 +608,45 @@ if __name__ == "__main__":
     # logger.info("MetafileWriter instance deleted, database connection should be closed now.")
     # logger.info("Exiting the script.")
 
-    # JUST PEEK INTO THE DYNAMIC TAGS DATABASE
-    from pprint import pprint
+    # # JUST PEEK INTO THE DYNAMIC TAGS DATABASE
+    # from pprint import pprint
 
-    metafile_writer = MetafileWriter(creation_mode=False)
-    logger.info("Peeking into the dynamic tags database")
-    dynamic_tags = metafile_writer.sqlite_cursor.execute(
-        """SELECT *
-        FROM dynamic_tags
-        WHERE tags NOT LIKE 'none';"""
-    ).fetchall()
-    # # Query for tags that start with '##' and end with '##' (whatever in the middle)
+    # metafile_writer = MetafileWriter(creation_mode=False)
+    # logger.info("Peeking into the dynamic tags database")
     # dynamic_tags = metafile_writer.sqlite_cursor.execute(
-    #     """
-    #     SELECT *
+    #     """SELECT *
     #     FROM dynamic_tags
-    #     WHERE tags GLOB '##*##';
-    #     """
+    #     WHERE tags NOT LIKE 'none';"""
     # ).fetchall()
-    logger.info("Dynamic tags database content:")
-    with open("data/text_output_streams/dynamic_tags_output.txt", "w") as f:
-        pprint(dynamic_tags, stream=f)
-    metafile_writer = None
-    logger.info("MetafileWriter set to None.")
-    logger.info("Exiting the script.")
+    # # # Query for tags that start with '##' and end with '##' (whatever in the middle)
+    # # dynamic_tags = metafile_writer.sqlite_cursor.execute(
+    # #     """
+    # #     SELECT *
+    # #     FROM dynamic_tags
+    # #     WHERE tags GLOB '##*##';
+    # #     """
+    # # ).fetchall()
+    # logger.info("Dynamic tags database content:")
+    # with open("data/text_output_streams/dynamic_tags_output.txt", "w") as f:
+    #     pprint(dynamic_tags, stream=f)
+    # metafile_writer = None
+    # logger.info("MetafileWriter set to None.")
+    # logger.info("Exiting the script.")
+
+    # # DEDUPLICATE THE DYNAMIC TAGS TABLE
+    # metafile_writer = MetafileWriter()
+    # logger.info("Deduplicating the dynamic tags table")
+    # metafile_writer.deduplicate_table()
+    # logger.info("Dynamic tags table deduplicated successfully")
+    # del metafile_writer
+    # logger.info("MetafileWriter instance deleted, database connection should be closed now.")
+    # logger.info("Exiting the script.")
+
+    # COUNT ENTRIES IN THE DYNAMIC TAGS TABLE
+    metafile_querier = MetafileQuerier()
+    logger.info("Counting entries in the dynamic tags table")
+    count = metafile_querier.sqlite_cursor.execute(
+        """SELECT COUNT(*) FROM dynamic_tags;"""
+    ).fetchone()[0]
+    logger.info(f"Dynamic tags table contains {count} entries")
+    metafile_querier = None
