@@ -463,8 +463,25 @@ class MetafileWriter:
 
 
 class MetafileQuerier:
-    # TODO : docstring. And also implement all of it.
-    pass
+    # TODO : docstrings.
+    # TODO : more complete implementation of the querier.
+
+    def __init__(self) -> None:
+        self.dynamic_tags_db = get_paths().dynamic_tags_db
+
+        assert (
+            self.dynamic_tags_db.exists()
+        ), "Dynamic tags database do not exist. Check configuration."
+
+        self.sqlite_connection = sqlite3.connect(self.dynamic_tags_db)
+        self.sqlite_cursor = self.sqlite_connection.cursor()
+        logger.info(f"Connected to dynamic tags database at {self.dynamic_tags_db}")
+
+    def get_all_tagged_ids(self) -> List[str]:
+        tagged_ids = self.sqlite_cursor.execute(
+            """SELECT message_id FROM dynamic_tags"""
+        ).fetchall()
+        return tagged_ids
 
 
 if __name__ == "__main__":
