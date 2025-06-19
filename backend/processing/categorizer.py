@@ -1,11 +1,18 @@
 from multiprocessing import Process, Queue
 from time import time
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from loguru import logger
 
-from backend.loaders.metafiles_handlers import BLACKLIST_TAG, NO_TAGS_TAG, MetafileWriter
-from backend.models.categorizer_model import CategorizerModel
+from backend.loaders.chroma_endpoints import ChromaQuerier
+from backend.loaders.metafiles_handlers import (
+    BLACKLIST_TAG,
+    EMPTY_TAG,
+    NO_TAGS_TAG,
+    MetafileQuerier,
+    MetafileWriter,
+)
+from backend.models.categorizer_model import Categorizer0, CategorizerModel
 
 
 def display_time(seconds: float, tz: int = 1, duration: bool = False) -> str:
@@ -225,3 +232,141 @@ class CategorizerEngine:
         # logger.info(
         #     f"Average processing time per message (excluding failed): {sum(processing_times) / llm_processed if llm_processed else 0:.2f} seconds"  # noqa: E501
         # )
+
+    def categorize_empty_batch(self, empty_messages: List[str]) -> None:
+        """
+        Batch categorize messages that are empty content.
+
+        This method DOESN'T CHECK that messages are actually empty. Message IDs provided MUST be checked for emptiness beforehand.
+        """  # TODO : complete docstring  # noqa: E501
+        empty_messages_dict: Dict[str, List[str]] = dict()
+
+        for empty_message_id in empty_messages:
+            empty_messages_dict[empty_message_id] = [EMPTY_TAG]
+
+        self.metafile_writer.write_tags_dict(empty_messages_dict)
+
+
+class AutoCategorizerEngine(CategorizerEngine):
+    """
+    A subclass of CategorizerEngine that automatically categorizes messages
+    using a predefined categorizer model.
+    """
+
+    def __init__(
+        self,
+        categorizer_model: CategorizerModel,
+        metafile_writer: MetafileWriter,
+        metafile_querier: MetafileQuerier,
+        chroma_querier: ChromaQuerier,
+    ) -> None:
+        """
+        Initializes the AutoCategorizerEngine with a given categorizer model.
+
+        :param categorizer_model: An instance of a subclass of CategorizerModel.
+        :param metafile_writer: An instance of MetafileWriter to write categories.
+        :param metafile_querier: An instance of MetafileQuerier to query existing categories.
+        :param chroma_querier: An instance of ChromaQuerier to query existing messages.
+        """
+        super().__init__(categorizer_model, metafile_writer)
+        self.metafile_querier = metafile_querier
+        self.chroma_querier = chroma_querier
+
+    def autodetemine_uncategorized(self) -> Tuple[List[Tuple[str, str]], List[str]]:
+        """
+        Determines uncategorized messages by cross-checking the metafile and Chroma database.
+
+        :return: A tuple containing a list of uncategorized messages (message ID, message text)
+                 and a list of message IDs for uncategorized empty messages.
+        """
+        logger.info("Determining uncategorized messages...")
+
+        # Get all messages from Chroma
+        nonempty = self.chroma_querier.get_all_nonempty_messages()
+        empty = self.chroma_querier.get_all_empty_messages()
+
+        logger.info(
+            f"Found {len(nonempty)} non-empty messages and {len(empty)} empty messages in Chroma."
+        )  # noqa: E501
+
+        # Get all categorized messages from metafile
+        categorized = self.metafile_querier.get_all_tagged_ids()
+
+        logger.info(f"Found {len(categorized)} categorized messages in metafile.")
+
+        # Determine uncategorized messages
+        nonempty_id_set = set(nonempty[:, 0])  # Extract message IDs from nonempty messages
+        empty_id_set = set(empty)
+
+        categorized_id_set = set(categorized)
+
+        uncategorized_nonempty_set = nonempty_id_set - categorized_id_set
+        uncategorized_empty_set = empty_id_set - categorized_id_set
+
+        # Recast to proper types
+        uncategorized_nonempty = [
+            (message_id, message_text)
+            for message_id, message_text in nonempty
+            if message_id in uncategorized_nonempty_set
+        ]
+        uncategorized_empty = list(uncategorized_empty_set)
+
+        logger.info(
+            f"Found {len(uncategorized_nonempty)} uncategorized non-empty messages and {len(uncategorized_empty)} uncategorized empty messages."  # noqa: E501
+        )
+
+        return uncategorized_nonempty, uncategorized_empty
+
+    def pipeline(self):
+        """
+        Runs the entire categorization pipeline:
+        1. Determines uncategorized messages.
+        2. Categorizes empty messages.
+        3. Categorizes non-empty messages.
+        """
+        logger.info("Starting categorization pipeline...")
+
+        # Step 1: Determine uncategorized messages
+        uncategorized_nonempty, uncategorized_empty = self.autodetemine_uncategorized()
+
+        # Step 2: Categorize empty messages
+        if uncategorized_empty:
+            self.categorize_empty_batch(uncategorized_empty)
+
+        # Step 3: Categorize non-empty messages
+        if uncategorized_nonempty:
+            self.categorize_batch(uncategorized_nonempty)
+
+        logger.success("Categorization pipeline completed successfully.")
+
+
+if __name__ == "__main__":
+    from backend.utils.log_setup import LoggerSetup
+
+    LoggerSetup.configure_logger(console_level="DEBUG")
+
+    logger.info("Starting Categorizer process...")
+    logger.warning("""You are running the categorizing handling script directly.
+                   This is intended for debugging purposes only.
+
+                   The script IS SUSCPTIBLE to write, read, and modify actual databases.
+                   It is not recommended to run this script in production environments.
+
+                   This script is not intended for production use.
+                   Users stay advised.""")
+
+    # Debug run
+    # TODO : at some point, ask for user input to proceed OR remove the debug run script.
+
+    # RUN AUTOMATIC CATEGORIZER PIPELINE
+    logger.info("Running automatic categorizer pipeline...")
+    # Initialize the categorizer engine with the model and metafile handlers
+    categorizer = AutoCategorizerEngine(
+        categorizer_model=Categorizer0(),
+        metafile_writer=MetafileWriter(),
+        metafile_querier=MetafileQuerier(),
+        chroma_querier=ChromaQuerier(),
+    )
+    # Run the categorization pipeline
+    logger.info("Starting categorization pipeline...")
+    categorizer.pipeline()
