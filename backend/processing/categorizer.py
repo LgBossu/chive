@@ -77,6 +77,8 @@ class CategorizerEngine:
         logger.debug(f"Already tagged messages: {list(already_tagged_messages)[:10]}...")
 
         # Get the messages to categorize
+        # TODO : debug set operations and metafiles querier :
+        # we produce duplicate messages to categorize
         logger.info("Retrieving messages to categorize")
         nonempty_array = chroma_querier.get_all_nonempty_messages()
         nonempty_uncategorized = [
@@ -243,6 +245,7 @@ class CategorizerEngine:
         Regex to match the log lines produced by the categorizer.
         This is used to monitor the subprocess' activity, and watch for stalling.
         """
+        # TODO : debug this regex, worked in legacy, fails to match in new version
         log_line_regex = r"\d{4}-\d{2}-\d{2}T(\d{2}:\d{2}:\d{2}\.\d{6})\+\d{4}\s.\s([A-Z]+)\s*.\s\w*:[^:]*:\d*\s-\s(.*)"  # noqa: E501
         return log_line_regex
 
@@ -273,8 +276,29 @@ class CategorizerEngine:
         """
         with open(self.ongoing_log_file, "r") as f:
             log_content = f.readlines()
-        last_log = log_content[-1]
-        str_last_time = self.parse_log_line(last_log)[0]
+        last_index = -1
+        while last_index >= -10:
+            try:
+                self.parse_log_line(log_content[last_index])
+                break
+            except ValueError:
+                # If the line cannot be parsed, it is not a valid log line
+                last_index -= 1
+                continue
+            except IndexError:
+                # If the index is out of range, we have reached the beginning of the file
+                # It is likely too early to check for stalling
+                return None
+        if last_index < -10:
+            logger.warning(
+                "Could not find a valid log line in the last 10 lines of the log file. "
+                "Assuming no stalling."
+            )
+            return None
+
+        # We have a valid log line, now we can check the last time it was logged
+        str_last_time = self.parse_log_line(log_content[last_index])[0]
+
         date_last_time = datetime.datetime.strptime(str_last_time, "%H:%M:%S.%f")
         if (datetime.datetime.now() - date_last_time).seconds > self.stalling_timeout:
             # The last log entry is older than the timeout
