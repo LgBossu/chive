@@ -14,7 +14,7 @@ class LoggerSetup:
     def configure_logger(
         console_level: Optional[str] = None,
         force_log_file: Optional[Path] = None,
-    ) -> None:
+    ) -> Path:
         """
         Set up loguru logger with a console and a file sink.
         This should be called once in the application's lifetime.
@@ -48,6 +48,9 @@ class LoggerSetup:
         )
 
         logger.info("Logger set up")
+
+        # Return the log file path for reference.
+        return LOG_FILE
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-# TODO : update docscrings
+# TODO : update docstrings
 import re
 from abc import ABC, abstractmethod
 from enum import Enum
@@ -42,6 +42,14 @@ class CategorizerModel(ABC):
       generating a response from the model, decoding the output, cleaning it,
       and finally parsing the categories.
     """  # noqa: E501
+
+    class ExceedingSafetyLimitError(Exception):
+        """
+        Exception raised when the input length exceeds the safety limit.
+        This is used to prevent unexpected behavior in the categorization process.
+        """
+
+        pass
 
     @abstractmethod
     def _check_model_path(self, model_path: Optional[Path]) -> Path:
@@ -227,7 +235,12 @@ class CategorizerModel(ABC):
         # TODO : implement this method in subclasses to provide specific parsing logic.
         pass
 
-    def categorize(self, message: str, max_output_length: int = 128) -> List[str]:
+    def categorize(
+        self,
+        message: str,
+        max_output_length: int = 128,
+        safety_input_length: int = 2048,
+    ) -> List[str]:
         """
         Categorizes the given message by constructing a prompt, tokenizing it,
         generating a response from the model, decoding the output, cleaning it,
@@ -239,6 +252,11 @@ class CategorizerModel(ABC):
         logger.info("Categorizing message")
         full_prompt = self._construct_full_prompt(message)
         input_tokens = self._tokenize(full_prompt)
+        if input_tokens.input_ids.shape[1] > safety_input_length:
+            logger.warning(
+                f"Input length {input_tokens.input_ids.shape[1]} exceeds safety limit of {safety_input_length} tokens. "  # noqa: E501
+            )
+            raise self.ExceedingSafetyLimitError("Input length exceeds safety limit. ")
         output = self._generate(input_tokens, max_output_length=max_output_length)
         decoded_output = self._decode_and_extract(full_prompt, output)
         cleaned_output = self._clean_llm_output(decoded_output)
@@ -318,7 +336,7 @@ class Categorizer0(CategorizerModel):
         :rtype: str
         """
         if torch.xpu.is_available():
-            logger.info("Using Intel GPU (XPU) for hardware acceleration.")
+            logger.success("Using Intel GPU (XPU) for hardware acceleration.")
             return "xpu"  # TODO : should xpu be hardcoded here?
             # Probably not, but it is the only one we support for now.
         else:
@@ -338,6 +356,14 @@ class Categorizer0(CategorizerModel):
         tokenizer = AutoTokenizer.from_pretrained(self.model_path)
         model = AutoModelForCausalLM.from_pretrained(self.model_path).to(self.hardware)
         return tokenizer, model
+
+    def __init__(self, model_path: Path | None = None):
+        super().__init__(model_path)
+        mem_bytes = (
+            torch.xpu.memory_allocated()
+        )  # Remember that this class implements XPU hardware acceleration.
+        mem_gb = mem_bytes / (1024**3)
+        logger.info(f"Memory info : {mem_gb:.3f} GB allocated on GPU.")
 
     @property
     def prompt_parts(self) -> Tuple[str, str]:
@@ -501,7 +527,6 @@ CATEGORIZATION:"""
 class AvailableCategorizers(Enum):
     """
     Enum for available categorizer models.
-    Currently, only one model is available: Categorizer0.
     """
 
     CATEGORIZER_0 = Categorizer0
