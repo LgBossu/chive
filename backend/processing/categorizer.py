@@ -38,9 +38,6 @@ class CategorizerEngine:
         logger_setup: LoggerSetup,
         categorizer_model_type: type[CategorizerModel],  # Lets the user specify
         # the categorizer model to use. We can try different models and implementations.
-        metafile_writer_type: type[MetafileWriter],  # TODO : are these arguments necessary ?
-        metafile_querier_type: type[MetafileQuerier],  # TODO : are these arguments necessary ?
-        chroma_querier_type: type[ChromaQuerier],  # TODO : are these arguments necessary ?
     ):
         # Set up the logger for the subprocess
         logger_setup.configure_logger(
@@ -68,9 +65,9 @@ class CategorizerEngine:
         categorizer_model: CategorizerModel = categorizer_model_type()
 
         # Instantiate queriers and metafile writer
-        metafile_writer: MetafileWriter = metafile_writer_type()
-        metafile_querier: MetafileQuerier = metafile_querier_type()
-        chroma_querier: ChromaQuerier = chroma_querier_type()
+        metafile_writer: MetafileWriter = MetafileWriter()
+        metafile_querier: MetafileQuerier = MetafileQuerier()
+        chroma_querier: ChromaQuerier = ChromaQuerier()
 
         # Get the tagged list
         logger.debug("Retrieving tagged list from metafile")
@@ -326,11 +323,6 @@ class CategorizerEngine:
                 self.ongoing_log_file,
                 LoggerSetup,
                 self.categorizer_model_type,
-                self.metafile_writer_type,
-                self.metafile_querier_type,
-                self.chroma_querier,
-                # messages_ids,
-                # messages_contents,
             ),
         )
         categorization_process.start()
