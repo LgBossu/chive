@@ -20,8 +20,6 @@ BLACKLIST_TAG = "######"
 EMPTY_TAG = "##EMPTY##"
 NO_TAGS_TAG = "##NO_TAGS##"
 
-NOT_TAGGED = True
-
 
 def clean_tags(raw_tags_lists: List[str]) -> List[str]:
     """
@@ -379,6 +377,7 @@ class MetafileWriter:
         self,
         message_id: str,
         tags: List[str],
+        check_for_duplicates: bool = False,
     ) -> None:
         """
         Write a single tagline to the dynamic tags database.
@@ -386,6 +385,19 @@ class MetafileWriter:
         :param message_id: The ID of the message.
         :param tags: A list of tags associated with the message.
         """
+        if check_for_duplicates:
+            # Check if the message ID already exists in the database
+            existing_tags = self.sqlite_cursor.execute(
+                "SELECT * FROM dynamic_tags WHERE message_id = ?;", (message_id,)
+            ).fetchone()
+            if existing_tags:
+                logger.error(
+                    f"Message ID {message_id} already exists in the dynamic tags database, yet writing operation was attempted."  # noqa: E501
+                )
+                raise RuntimeError(
+                    f"Attempted to write over {message_id}, but it already exists in the dynamic tags database."  # noqa: E501
+                )
+
         # Join tags into a single string
         tags.sort()  # Sort tags for consistency
         # TODO : document somewhere that tags are sorted in alphabetical order

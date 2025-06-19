@@ -1,4 +1,4 @@
-# from time import time
+import re
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -12,23 +12,34 @@ from transformers.tokenization_utils import PreTrainedTokenizer
 
 from backend.utils.path_utils import get_paths
 
-# def display_time(seconds: float, tz: int = 1, duration: bool = False) -> str:
-#     _, seconds = divmod(seconds, 86400)
-#     hours, seconds = divmod(seconds, 3600)
-#     if not duration:
-#         hours = (hours + tz) % 24  # We are dealing with a date and account for timezone
-#     minutes, seconds = divmod(seconds, 60)
-#     milliseconds = (seconds - int(seconds)) * 1000
-#     seconds = int(seconds)
-#     return f"{int(hours)}h {int(minutes)}m {seconds}s {int(milliseconds)}ms"
-
 
 class CategorizerModel(ABC):
     """
-    An abstract base class for categorizer models.
+    An abstract base class for torch-based categorizer models.
 
     The role of these models is to categorize text messages dynamically.
-    """
+
+    ABSTRACT METHODS:
+    - _check_model_path: Checks if the provided model path is valid and returns it.
+    - _check_hardware_acceleration: Checks if the hardware acceleration is available.
+    - _load_model: Loads the model and tokenizer from the specified path.
+    - prompt_parts: Gets the parts of the prompt used for categorization.
+    - model_parameters: Returns the parameters of the model used for categorization.
+    - _clean_llm_output: Cleans the LLM output to ensure it is in a usable format.
+    - _parse_categories: Parses the cleaned output to extract categories.
+
+    METHODS:
+    - __init__: Initializes the categorizer model, checking the model path and hardware acceleration,
+      before loading the model and tokenizer.
+    - _construct_full_prompt: Constructs the full prompt by combining the prefix, the message to categorize,
+      and the suffix.
+    - _tokenize: Tokenizes the full prompt using the tokenizer.
+    - _generate: Generates a response from the model based on the input tokens.
+    - _decode_and_extract: Decodes the generated output and extracts the relevant part.
+    - categorize: Categorizes the given message by constructing a prompt, tokenizing it,
+      generating a response from the model, decoding the output, cleaning it,
+      and finally parsing the categories.
+    """  # noqa: E501
 
     @abstractmethod
     def _check_model_path(self, model_path: Optional[Path]) -> Path:
@@ -73,7 +84,13 @@ class CategorizerModel(ABC):
         Initializes the categorizer model, checking the model path and hardware acceleration,
         before loading the model and tokenizer.
 
-        :param model_path: Optional path to the model file.
+        :param model_path: Optional path to the model file. If not provided, a default path is used.
+
+        Initializes attributes:
+        - model_path: The path to the model file.
+        - hardware: The type of hardware acceleration available (e.g., "cuda", "xpu"...)
+        - tokenizer: The tokenizer for the model.
+        - model: The model for categorization.
         """  # noqa: E501
 
         self.model_path = self._check_model_path(model_path)
@@ -196,7 +213,7 @@ class CategorizerModel(ABC):
         # TODO : implement this method in subclasses to provide specific parsing logic.
         pass
 
-    def categorize(self, message: str) -> List[str]:
+    def categorize(self, message: str, max_output_length: int = 128) -> List[str]:
         """
         Categorizes the given message by constructing a prompt, tokenizing it,
         generating a response from the model, decoding the output, cleaning it,
@@ -208,10 +225,249 @@ class CategorizerModel(ABC):
         logger.info(f"Categorizing message: {message}")
         full_prompt = self._construct_full_prompt(message)
         input_tokens = self._tokenize(full_prompt)
-        output = self._generate(input_tokens)
+        output = self._generate(input_tokens, max_output_length=max_output_length)
         decoded_output = self._decode_and_extract(full_prompt, output)
         cleaned_output = self._clean_llm_output(decoded_output)
         categories = self._parse_categories(cleaned_output)
 
         logger.info(f"Categories found: {categories}")
         return categories
+
+    @abstractmethod
+    def __del__(self):
+        """
+        Cleans up the model and tokenizer when the instance is deleted.
+        This is important to free up resources, especially for large models.
+
+        The method should be overridden in subclasses to ensure proper cleanup of the cache.
+        """
+        logger.debug("Cleaning up the categorizer model and tokenizer.")
+        del self.tokenizer
+        del self.model
+
+    @property
+    @abstractmethod
+    def timeout(self) -> int:
+        """
+        Returns the timeout for the categorization process.
+        This should be implemented in subclasses to provide specific timeout values.
+
+        :return: The timeout value in seconds.
+        :rtype: int
+        """
+        pass
+
+    @property
+    @abstractmethod
+    def recommended_output_length(self) -> int:
+        """
+        Returns the recommended output length for the categorization process.
+        This is used to limit the length of the generated output.
+
+        :return: The recommended output length in tokens.
+        :rtype: int
+        """
+        pass
+
+
+class Categorizer0(CategorizerModel):
+    """
+    This default categorizer model uses Llama 3.2, and plugs into 'xpu' hardware acceleration
+    to support Intel GPU calculations.
+    """
+
+    def _check_model_path(self, model_path: Optional[Path]) -> Path:
+        """
+        Checks if the provided model path is valid and returns it.
+        If no path is provided, a default path is used.
+
+        :param model_path: Optional path to the model file.
+        :return: A valid model path.
+        :raises FileNotFoundError: If the model file does not exist.
+        :raises ValueError: If the model path is not a directory.
+        """
+        if model_path is None:
+            model_path = get_paths().small_model_path
+        if not model_path.exists():
+            raise FileNotFoundError(f"Model file not found at {model_path}")
+        if not model_path.is_dir():
+            raise ValueError(f"Model path {model_path} is not a directory.")
+        return model_path
+
+    def _check_hardware_acceleration(self) -> str:
+        """
+        Checks if the hardware acceleration is available.
+        Raises an error if it is not available.
+
+        :raises RuntimeError: If hardware acceleration is not available.
+        :return: The type of hardware acceleration available (e.g., "cuda", "xpu"...)
+        :rtype: str
+        """
+        if torch.xpu.is_available():
+            logger.info("Using Intel GPU (XPU) for hardware acceleration.")
+            return "xpu"  # TODO : should xpu be hardcoded here?
+            # Probably not, but it is the only one we support for now.
+        else:
+            logger.error("Intel GPU (XPU) is not available. Please check your setup.")
+            raise RuntimeError("Intel GPU (XPU) is not available. Please check your setup.")
+
+    def _load_model(self) -> Tuple[PreTrainedTokenizer, PreTrainedModel]:
+        """
+        Loads the model and tokenizer from the specified path.
+
+        The model is mapped to the hardware device specified by `self.hardware`.
+
+        :return: A tuple containing the tokenizer and the model.
+        :rtype: Tuple[PreTrainedTokenizer, PreTrainedModel]
+        """
+        logger.info(f"Loading model from {self.model_path} on [{self.hardware}] device.")
+        tokenizer = AutoTokenizer.from_pretrained(self.model_path)
+        model = AutoModelForCausalLM.from_pretrained(self.model_path).to(self.hardware)
+        return tokenizer, model
+
+    @property
+    def prompt_parts(self) -> Tuple[str, str]:
+        """
+        Gets the parts of the prompt used for categorization,
+        in a general expected structure of (prefix, suffix), meant to be used as :
+        prefix + [message to categorize] + suffix
+
+        :return: A tuple containing the prefix and suffix of the prompt.
+        :rtype: Tuple[str, str]
+        """
+
+        prompt_begin = """You are a helpful assistant. Given a user message, your job is to identify its main topic(s) or emotional theme(s) in a few simple words.
+
+        - Return a short, comma-separated list of themes.
+        - Output only the list.
+        - If the message has no meaningful content, respond with: none.
+        - End your response with <END>.
+
+        Here are some examples:
+
+        MESSAGE: [ok lol!]
+        CATEGORIZATION: none <END>
+
+        MESSAGE: [I'm feeling a bit overwhelmed, but also proud of the work I did today.]
+        CATEGORIZATION: stress, accomplishment, self-reflection <END>
+
+        MESSAGE: [I just made saffron rice with lemon and it actually turned out amazing!]
+        CATEGORIZATION: cooking, food, pride <END>
+
+        MESSAGE: ["""  # noqa: E501
+
+        prompt_end = """]
+        CATEGORIZATION:"""
+
+        return prompt_begin, prompt_end
+
+    @property
+    def model_parameters(self) -> Dict[str, Any]:
+        """
+        Returns the parameters of the model used for categorization.
+        This should be implemented in subclasses to provide specific model parameters.
+
+        :return: A dictionary containing the model parameters.
+        :rtype: Dict[str, Any]
+        """
+        parameters = {
+            "min_length": 1,  # Make sure it returns *something*
+            "repetition_penalty": 1.1,
+            # no_repeat_ngram_size:2,
+            "length_penalty": -0.1,  # Neutral length bias
+            "num_beams": 5,  # Sampling + 1 beam = freeform
+            "early_stopping": True,
+            "temperature": None,
+            "do_sample": False,
+            "top_p": None,
+            "top_k": None,
+            "pad_token_id": self.tokenizer.eos_token_id,
+        }
+        return parameters
+
+    def _clean_llm_output(self, output: str) -> str:
+        """
+        Cleans the LLM output to ensure it is in a usable format.
+
+        :param output: The raw output from the model.
+        :return: The cleaned output string.
+        """
+        logger.trace("Cleaning output")
+        output = output.lower().strip()
+
+        # Try to split on a variant of <end>
+        end_match = re.search(r"<.*end.*>", output)
+        if end_match:
+            output = output[: end_match.start()].strip()
+        else:
+            arbitrary_match = re.search(r"<.*>", output)
+            if arbitrary_match:
+                output = output[: arbitrary_match.start()].strip()
+        logger.trace(f"Output after <end> removal: {output}")
+
+        # Remove brackets and quotes
+        output = output.replace("[", "").replace("]", "")
+        output = output.replace('"', "").replace("'", "")
+
+        # Remove unwanted prefixes (hallucinated headers)
+        for token in ["categorization:", "category:", "# output", "response:"]:
+            output = output.replace(token, "")
+
+        # Collapse extra whitespace
+        output = re.sub(r"\s+", " ", output).strip()
+
+        # Default to 'none' if output is empty
+        if not output or output in ["<end>", "none <end>"]:
+            output = "none"
+
+        output = output.replace(", ", ";")
+
+        logger.trace(f"Final cleaned output: {output}")
+
+        return output
+
+    def _parse_categories(self, output: str) -> List[str]:
+        """
+        Parses the cleaned output to extract categories.
+
+        :param output: The cleaned output string.
+        :return: A list of categories extracted from the output.
+        """
+        logger.trace("Parsing categories from output")
+        # Split by semicolon and strip whitespace
+        categories = [cat.strip() for cat in output.split(";") if cat.strip()]
+        logger.trace(f"Parsed categories: {categories}")
+        return categories
+
+    def __del__(self):
+        """
+        Cleans up the model and tokenizer when the instance is deleted.
+        This is important to free up resources, especially for large models.
+
+        The method should be overridden in subclasses to ensure proper cleanup of the cache.
+        """
+        super().__del__()
+        torch.xpu.empty_cache()
+        logger.debug("Categorizer0 model and tokenizer cleaned up.")
+
+    @property
+    def timeout(self) -> int:
+        """
+        Returns the timeout for the categorization process.
+        This should be implemented in subclasses to provide specific timeout values.
+
+        :return: The timeout value in seconds.
+        :rtype: int
+        """
+        return 30
+
+    @property
+    def recommended_output_length(self) -> int:
+        """
+        Returns the recommended output length for the categorization process.
+        This is used to limit the length of the generated output.
+
+        :return: The recommended output length in tokens.
+        :rtype: int
+        """
+        return 30
