@@ -417,12 +417,14 @@ class MetafileWriter:
         :param current_to_tags: A dictionary mapping message IDs to lists of tags.
         """
         if not self.creation_mode:
-            logger.error(
+            logger.warning(
                 "In current version, mass writing is assumed to be creation mode exclusive. Are you sure of what you are doing?"  # noqa: E501
             )
-            raise RuntimeError(
-                "Mass writing to the dynamic tags database is only allowed in creation mode."
-            )
+            # raise RuntimeError(
+            #     "Mass writing to the dynamic tags database is only allowed in creation mode."
+            # )
+            # TODO : lighten the restriction on mass writing to the dynamic tags database,
+            # it is useful in other cases than creation mode.
 
         logger.info("Writing tags to the dynamic tags database")
 
