@@ -1,5 +1,7 @@
 from enum import Enum
 
+from loguru import logger
+
 
 class AcceptedDTypes(Enum):
     STR = str
@@ -20,15 +22,18 @@ def check_dtype(value) -> bool:
     return False
 
 
-def cast_metadata(
-    metadata_dict: dict, conv_id: str
-) -> dict[str, str | int | float | bool]:
+def cast_metadata(metadata_dict: str | dict, conv_id: str) -> dict[str, str | int | float | bool]:
     """
     Cast the metadata dictionary to the correct types.
     :param metadata_dict: The metadata dictionary
     :param conv_id: The conversation ID
     :return: The casted metadata dictionary
     """
+    if isinstance(metadata_dict, str):
+        logger.error(
+            "Metadata is a string, expected a dictionary. Please check for faulty data parsing logic or faulty data."  # noqa: E501
+        )
+        raise ValueError("Metadata should be a dictionary, not a string.")
     res = dict()
     for key, value in metadata_dict.items():
         if check_dtype(value):

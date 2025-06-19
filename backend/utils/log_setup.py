@@ -1,29 +1,57 @@
 import sys
+from pathlib import Path
+from typing import Optional
 
 from loguru import logger
-from utils import load_paths as lp
 
-logger.info("Setting up the logger")
-
-# Initialize the paths
-LOG_FILE = lp.get_paths()["log_file"]
-
-# Set up the logger
-logger.remove()
-logger.add(
-    sink=sys.stdout,  # Output to the console
-    format="<level>{level:<10} | {message}</>",
-    level="INFO",
-    colorize=True,
-)
-logger.add(
-    sink=LOG_FILE,  # Output to the log file
-    format="{time} | {level:<10} | {name}:{function}:{line} - {message}",
-    level="TRACE",
-    backtrace=True,
-    diagnose=True,
-    colorize=True,
-)
+from backend.utils.path_utils import get_paths
 
 
-logger.info("Logger set up")
+class LoggerSetup:
+    # Retrieve the log file path once to be reused.
+
+    @staticmethod
+    def configure_logger(
+        console_level: Optional[str] = None,
+        force_log_file: Optional[Path] = None,
+    ) -> Path:
+        """
+        Set up loguru logger with a console and a file sink.
+        This should be called once in the application's lifetime.
+        """
+        if force_log_file is not None:
+            LOG_FILE = force_log_file
+        else:
+            LOG_FILE = get_paths().log_file
+
+        if console_level not in ["TRACE", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]:
+            console_level = "INFO"
+        # Remove any default loggers to prevent duplicate logs.
+        logger.remove()
+
+        # Set up logging to the console.
+        logger.add(
+            sink=sys.stdout,
+            format="<level>{level:<10} | {message}</>",
+            level=console_level,
+            colorize=True,
+        )
+
+        # Set up logging to a file.
+        logger.add(
+            sink=LOG_FILE,
+            format="{time} | {level:<10} | {name}:{function}:{line} - {message}",
+            level="TRACE",
+            backtrace=True,
+            diagnose=True,
+            colorize=True,
+        )
+
+        logger.info("Logger set up")
+
+        # Return the log file path for reference.
+        return LOG_FILE
+
+
+if __name__ == "__main__":
+    LoggerSetup.configure_logger()
