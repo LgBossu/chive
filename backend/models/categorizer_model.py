@@ -352,26 +352,26 @@ class Categorizer0(CategorizerModel):
 
         prompt_begin = """You are a helpful assistant. Given a user message, your job is to identify its main topic(s) or emotional theme(s) in a few simple words.
 
-        - Return a short, comma-separated list of themes.
-        - Output only the list.
-        - If the message has no meaningful content, respond with: none.
-        - End your response with <END>.
+- Return a short, comma-separated list of themes.
+- Output only the list.
+- If the message has no meaningful content, respond with: none.
+- End your response with <END>.
 
-        Here are some examples:
+Here are some examples:
 
-        MESSAGE: [ok lol!]
-        CATEGORIZATION: none <END>
+MESSAGE: [ok lol!]
+CATEGORIZATION: none <END>
 
-        MESSAGE: [I'm feeling a bit overwhelmed, but also proud of the work I did today.]
-        CATEGORIZATION: stress, accomplishment, self-reflection <END>
+MESSAGE: [I'm feeling a bit overwhelmed, but also proud of the work I did today.]
+CATEGORIZATION: stress, accomplishment, self-reflection <END>
 
-        MESSAGE: [I just made saffron rice with lemon and it actually turned out amazing!]
-        CATEGORIZATION: cooking, food, pride <END>
+MESSAGE: [I just made saffron rice with lemon and it actually turned out amazing!]
+CATEGORIZATION: cooking, food, pride <END>
 
-        MESSAGE: ["""  # noqa: E501
+MESSAGE: ["""  # noqa: E501
 
         prompt_end = """]
-        CATEGORIZATION:"""
+CATEGORIZATION:"""
 
         return prompt_begin, prompt_end
 
