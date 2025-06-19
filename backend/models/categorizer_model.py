@@ -249,7 +249,7 @@ class CategorizerModel(ABC):
         :param message: The message to categorize.
         :return: A list of categories for the message.
         """
-        logger.info("Categorizing message")
+        logger.trace("Categorizing message")
         full_prompt = self._construct_full_prompt(message)
         input_tokens = self._tokenize(full_prompt)
         if input_tokens.input_ids.shape[1] > safety_input_length:
@@ -262,7 +262,7 @@ class CategorizerModel(ABC):
         cleaned_output = self._clean_llm_output(decoded_output)
         categories = self._parse_categories(cleaned_output)
 
-        logger.info(f"Categories found: {categories}")
+        logger.trace(f"Categories found: {categories}")
         return categories
 
     @abstractmethod
