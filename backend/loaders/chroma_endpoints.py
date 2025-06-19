@@ -620,6 +620,11 @@ if __name__ == "__main__":
     logger.info("Current collections' lengths:")
     for collection_name, count in counts.items():
         logger.info(f"{collection_name}: {count} documents")
+
+    # Find and display the number of empty messages
+    empty_messages = querier.get_all_empty_messages()
+    logger.info(f"Number of empty messages: {len(empty_messages)}")
+
     logger.info("You can now use the ChromaDB client to query or manipulate the data.")
     logger.info("ChromaDB client is ready for use.")
 
