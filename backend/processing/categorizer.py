@@ -53,6 +53,8 @@ class CategorizerEngine:
         :param message: The message to categorize.
         :param max_output_length: The maximum length of the output categories.
         """
+        raise NotImplementedError("Refactoring to come")
+
         try:
             categories = self.categorizer_model.categorize(
                 message, max_output_length=max_output_length
@@ -68,6 +70,8 @@ class CategorizerEngine:
         max_output_length_override: Optional[int] = None,
         timeout_override: Optional[int] = None,
     ) -> List[str] | None:
+        raise NotImplementedError("Refactoring to come")
+
         """
         Categorizes a message using the categorizer model in a separate process.
 
@@ -119,6 +123,8 @@ class CategorizerEngine:
         max_output_length_override: Optional[int] = None,
         timeout_override: Optional[int] = None,
     ) -> None:
+        raise NotImplementedError("Refactoring to come")
+
         """
         Categorizes a single message using the categorizer model.
 
@@ -160,6 +166,8 @@ class CategorizerEngine:
         max_output_length_override: Optional[int] = None,
         timeout_override: Optional[int] = None,
     ) -> None:
+        raise NotImplementedError("Refactoring to come")
+
         """
         Categorizes a batch of messages using the categorizer model.
 
@@ -241,6 +249,7 @@ class CategorizerEngine:
         # )
 
     def categorize_empty_batch(self, empty_messages: List[str]) -> None:
+        raise NotImplementedError("Refactoring to come")
         """
         Batch categorize messages that are empty content.
 
@@ -267,6 +276,8 @@ class AutoCategorizerEngine(CategorizerEngine):
         metafile_querier: MetafileQuerier,
         chroma_querier: ChromaQuerier,
     ) -> None:
+        raise NotImplementedError("Refactoring to come")
+
         """
         Initializes the AutoCategorizerEngine with a given categorizer model.
 
@@ -280,6 +291,8 @@ class AutoCategorizerEngine(CategorizerEngine):
         self.chroma_querier = chroma_querier
 
     def autodetemine_uncategorized(self) -> Tuple[List[Tuple[str, str]], List[str]]:
+        raise NotImplementedError("Refactoring to come")
+
         """
         Determines uncategorized messages by cross-checking the metafile and Chroma database.
 
@@ -325,6 +338,8 @@ class AutoCategorizerEngine(CategorizerEngine):
         return uncategorized_nonempty, uncategorized_empty
 
     def pipeline(self):
+        raise NotImplementedError("Refactoring to come")
+
         """
         Runs the entire categorization pipeline:
         1. Determines uncategorized messages.
@@ -371,12 +386,14 @@ if __name__ == "__main__":
 
     # RUN AUTOMATIC CATEGORIZER PIPELINE
     logger.info("Running automatic categorizer pipeline...")
-    # Initialize the categorizer engine with the model and metafile handlers
-    categorizer = AutoCategorizerEngine(
-        categorizer_model=Categorizer0(),
-        metafile_writer=MetafileWriter(),
-        metafile_querier=MetafileQuerier(),
-        chroma_querier=ChromaQuerier(),
-    )
-    # Run the categorization pipeline
-    categorizer.pipeline()
+    raise NotImplementedError("Refactoring to come")
+
+    # # Initialize the categorizer engine with the model and metafile handlers
+    # categorizer = AutoCategorizerEngine(
+    #     categorizer_model=Categorizer0(),
+    #     metafile_writer=MetafileWriter(),
+    #     metafile_querier=MetafileQuerier(),
+    #     chroma_querier=ChromaQuerier(),
+    # )
+    # # Run the categorization pipeline
+    # categorizer.pipeline()
