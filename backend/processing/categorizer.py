@@ -36,12 +36,11 @@ class CategorizerEngine:
     def categorization_loop(
         LOG_FILE: Path,
         logger_setup: LoggerSetup,
-        categorizer_model_type: type[CategorizerModel],
-        metafile_writer_type: type[MetafileWriter],
-        metafile_querier_type: type[MetafileQuerier],
-        chroma_querier_type: type[ChromaQuerier],
-        # messages_ids: List[str],
-        # messages_contents: List[str],
+        categorizer_model_type: type[CategorizerModel],  # Lets the user specify
+        # the categorizer model to use. We can try different models and implementations.
+        metafile_writer_type: type[MetafileWriter],  # TODO : are these arguments necessary ?
+        metafile_querier_type: type[MetafileQuerier],  # TODO : are these arguments necessary ?
+        chroma_querier_type: type[ChromaQuerier],  # TODO : are these arguments necessary ?
     ):
         # Set up the logger for the subprocess
         logger_setup.configure_logger(
@@ -340,8 +339,9 @@ class CategorizerEngine:
 
     def run_categorization(self) -> None:
         logger.info("Setting up persistent categorization")
-        non_faulty_stalls = 0
         while True:
+            non_faulty_stalls = 0
+            # TODO : check where ELSE non_faulty_stalls needs to be reset, if at all.
             subprocess = self.launch_categorization()
             logger.info("Subprocess up and running. Watching for stalling.")
             terminated = False
