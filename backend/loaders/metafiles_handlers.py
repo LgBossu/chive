@@ -353,7 +353,7 @@ class MetafileWriter:
         else:
             self.sqlite_connection = sqlite3.connect(self.dynamic_tags_db)
             self.sqlite_cursor = self.sqlite_connection.cursor()
-            logger.info(f"Connected to dynamic tags database at {self.dynamic_tags_db}")
+            logger.debug(f"Connected writer to dynamic tags database at {self.dynamic_tags_db}")
 
     def create_dynamic_tags_table(self) -> None:
         """
@@ -505,7 +505,7 @@ class MetafileQuerier:
 
         self.sqlite_connection = sqlite3.connect(self.dynamic_tags_db)
         self.sqlite_cursor = self.sqlite_connection.cursor()
-        logger.info(f"Connected to dynamic tags database at {self.dynamic_tags_db}")
+        logger.debug(f"Connected querier to dynamic tags database at {self.dynamic_tags_db}")
 
     def get_all_tagged_ids(self) -> List[str]:
         tagged_ids = [

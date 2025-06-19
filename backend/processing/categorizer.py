@@ -71,7 +71,7 @@ class CategorizerEngine:
         chroma_querier: ChromaQuerier = chroma_querier_type()
 
         # Get the tagged list
-        logger.info("Retrieving tagged list from metafile")
+        logger.debug("Retrieving tagged list from metafile")
         already_tagged_messages = set(metafile_querier.get_all_tagged_ids())
         logger.info(f"Already tagged messages: {len(already_tagged_messages)}")
         logger.debug(f"Already tagged messages: {list(already_tagged_messages)[:10]}...")
@@ -79,7 +79,7 @@ class CategorizerEngine:
         # Get the messages to categorize
         # TODO : debug set operations and metafiles querier :
         # we produce duplicate messages to categorize
-        logger.info("Retrieving messages to categorize")
+        logger.debug("Retrieving messages to categorize")
         nonempty_array = chroma_querier.get_all_nonempty_messages()
         nonempty_uncategorized = [
             (message_id, message_content)
