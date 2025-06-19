@@ -480,9 +480,12 @@ class MetafileQuerier:
         logger.info(f"Connected to dynamic tags database at {self.dynamic_tags_db}")
 
     def get_all_tagged_ids(self) -> List[str]:
-        tagged_ids = self.sqlite_cursor.execute(
-            """SELECT message_id FROM dynamic_tags"""
-        ).fetchall()
+        tagged_ids = [
+            row[0]
+            for row in self.sqlite_cursor.execute(
+                """SELECT message_id FROM dynamic_tags"""
+            ).fetchall()
+        ]
         return tagged_ids
 
 
