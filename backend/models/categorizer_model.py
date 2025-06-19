@@ -179,6 +179,18 @@ class CategorizerModel(ABC):
         # to avoid hardcoding and allow for easy editing and tuning.
         pass
 
+    @property
+    @abstractmethod
+    def recommended_output_length(self) -> int:
+        """
+        Returns the recommended output length for the categorization process.
+        This is used to limit the length of the generated output.
+
+        :return: The recommended output length in tokens.
+        :rtype: int
+        """
+        pass
+
     def _generate(self, input_tokens, max_output_length: int = 128):
         """
         Generates a response from the model based on the input tokens.
@@ -238,7 +250,7 @@ class CategorizerModel(ABC):
     def categorize(
         self,
         message: str,
-        max_output_length: int = 128,
+        max_output_length: Optional[int] = None,
         safety_input_length: int = 2048,
     ) -> List[str]:
         """
@@ -249,6 +261,9 @@ class CategorizerModel(ABC):
         :param message: The message to categorize.
         :return: A list of categories for the message.
         """
+        if max_output_length is None:
+            max_output_length = self.recommended_output_length
+
         logger.trace("Categorizing message")
         full_prompt = self._construct_full_prompt(message)
         input_tokens = self._tokenize(full_prompt)
@@ -285,18 +300,6 @@ class CategorizerModel(ABC):
         This should be implemented in subclasses to provide specific timeout values.
 
         :return: The timeout value in seconds.
-        :rtype: int
-        """
-        pass
-
-    @property
-    @abstractmethod
-    def recommended_output_length(self) -> int:
-        """
-        Returns the recommended output length for the categorization process.
-        This is used to limit the length of the generated output.
-
-        :return: The recommended output length in tokens.
         :rtype: int
         """
         pass
