@@ -413,6 +413,12 @@ CATEGORIZATION:"""
         :return: A dictionary containing the model parameters.
         :rtype: Dict[str, Any]
         """
+        # TODO : (maintainer)
+        # Keep every decode-time hyper-parameter (max_new_tokens, num_beams, temp, etc.)
+        # in ONE central dict, e.g. config.DECODING.
+        # Always call:  preds = model.generate(**tok, **config.DECODING)
+        # so any future tweak happens in a single place and can be guarded by tests.
+
         parameters = {
             "min_length": 1,  # Make sure it returns *something*
             "repetition_penalty": 1.1,
