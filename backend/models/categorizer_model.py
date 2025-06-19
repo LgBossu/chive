@@ -1,5 +1,7 @@
+# TODO : update docscrings
 import re
 from abc import ABC, abstractmethod
+from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -116,6 +118,18 @@ class CategorizerModel(ABC):
         # to avoid hardcoding and allow for easy editing and tuning.
         pass
 
+    @property
+    @abstractmethod
+    def safe_max_length(self) -> int:
+        """
+        Returns the maximum length (in tokens) that the model can handle reliably.
+        This should be implemented in subclasses to provide specific maximum length values.
+
+        :return: The maximum length in tokens.
+        :rtype: int
+        """
+        pass
+
     def _construct_full_prompt(self, message: str) -> str:
         """
         Constructs the full prompt by combining the prefix, the message to categorize,
@@ -222,7 +236,7 @@ class CategorizerModel(ABC):
         :param message: The message to categorize.
         :return: A list of categories for the message.
         """
-        logger.info(f"Categorizing message: {message}")
+        logger.info("Categorizing message")
         full_prompt = self._construct_full_prompt(message)
         input_tokens = self._tokenize(full_prompt)
         output = self._generate(input_tokens, max_output_length=max_output_length)
@@ -385,6 +399,17 @@ class Categorizer0(CategorizerModel):
         }
         return parameters
 
+    @property
+    def safe_max_length(self) -> int:
+        """
+        Returns the maximum length (in tokens) that the model can handle reliably.
+        This should be implemented in subclasses to provide specific maximum length values.
+
+        :return: The maximum length in tokens.
+        :rtype: int
+        """
+        return 2048
+
     def _clean_llm_output(self, output: str) -> str:
         """
         Cleans the LLM output to ensure it is in a usable format.
@@ -471,3 +496,12 @@ class Categorizer0(CategorizerModel):
         :rtype: int
         """
         return 30
+
+
+class AvailableCategorizers(Enum):
+    """
+    Enum for available categorizer models.
+    Currently, only one model is available: Categorizer0.
+    """
+
+    CATEGORIZER_0 = Categorizer0
