@@ -1,4 +1,5 @@
 import sys
+from pathlib import Path
 from typing import Optional
 
 from loguru import logger
@@ -8,14 +9,21 @@ from backend.utils.path_utils import get_paths
 
 class LoggerSetup:
     # Retrieve the log file path once to be reused.
-    LOG_FILE = get_paths().log_file
 
     @staticmethod
-    def configure_logger(console_level: Optional[str] = None) -> None:
+    def configure_logger(
+        console_level: Optional[str] = None,
+        force_log_file: Optional[Path] = None,
+    ) -> None:
         """
         Set up loguru logger with a console and a file sink.
         This should be called once in the application's lifetime.
         """
+        if force_log_file is not None:
+            LOG_FILE = force_log_file
+        else:
+            LOG_FILE = get_paths().log_file
+
         if console_level not in ["TRACE", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]:
             console_level = "INFO"
         # Remove any default loggers to prevent duplicate logs.
@@ -31,7 +39,7 @@ class LoggerSetup:
 
         # Set up logging to a file.
         logger.add(
-            sink=LoggerSetup.LOG_FILE,
+            sink=LOG_FILE,
             format="{time} | {level:<10} | {name}:{function}:{line} - {message}",
             level="TRACE",
             backtrace=True,
