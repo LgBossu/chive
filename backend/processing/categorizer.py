@@ -346,7 +346,6 @@ class CategorizerEngine:
                 faulty_id = self.check_for_timeouts()
                 if faulty_id is None:
                     non_faulty_stalls = 0  # There is no stalling, reset the counter
-                    logger.trace("Subprocess is still running, no stalling detected.")
                     continue
                 elif faulty_id == NO_STALLING_ID:
                     non_faulty_stalls += 1
