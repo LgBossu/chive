@@ -1,0 +1,122 @@
+/* Base colors for dark mode */
+:root {
+    --bg: #1e1e1e;
+    --panel: #2c2c2c;
+    --highlight: #3a3a3a;
+    --text: #e0e0e0;
+    --user: #c88e31;
+    --assistant: #b15050;
+    --accent: #6bb7ff;
+}
+
+/* If the user has dark mode enabled, keep this. If not, fall back to light (optional) */
+@media (prefers-color-scheme: light) {
+    :root {
+        --bg: #f4f4f4;
+        --panel: #e0e0e0;
+        --highlight: #ffffff;
+        --text: #1a1a1a;
+        --user: #ffd591;
+        --assistant: #ffabab;
+        --accent: #3399ff;
+    }
+}
+
+/* Apply colors globally */
+body {
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: sans-serif;
+    margin: 0;
+    /* display: flex;
+    height: auto; */
+}
+
+/* Root layout */
+#app-container {
+    display: flex;
+    height: 100vh;
+    font-family: sans-serif;
+}
+
+/* Conversation area */
+#conversation-panel {
+    flex: 1;
+    background-color: var(--bg);
+    padding: 1rem;
+    overflow-y: scroll;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.message {
+    max-width: 70%;
+    padding: 0.8rem 1.2rem;
+    border-radius: 0.75rem;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    /* Subtle shadow for depth -- TODO : move dependency to top of file*/
+    font-size: 0.95rem;
+}
+
+.message.user {
+    align-self: flex-end;
+    background-color: var(--user);
+    color: var(--text);
+}
+
+.message.assistant {
+    align-self: flex-start;
+    background-color: var(--assistant);
+    color: var(--text);
+}
+
+/* Sidebar */
+#side-panel {
+    width: 320px;
+    background-color: var(--panel);
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    overflow-y: auto;
+}
+
+#search-database,
+#edit-metadata {
+    background-color: var(--highlight);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+#search-database h2,
+#edit-metadata h2 {
+    margin-top: 0;
+    font-size: 1.1rem;
+}
+
+#search-database button,
+#edit-metadata button {
+    margin-top: 0.5rem;
+    padding: 0.4rem 0.8rem;
+    background-color: var(--accent);
+    border: none;
+    color: var(--text);
+    border-radius: 0.4rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+#search-database button:hover,
+#edit-metadata button:hover {
+    background-color: var(--accent);
+}
+
+textarea {
+    width: 90%;
+    height: 80px;
+    resize: vertical;
+    padding: 0.5rem;
+    font-family: monospace;
+}
