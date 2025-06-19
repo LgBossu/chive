@@ -246,7 +246,7 @@ class CategorizerEngine:
         This is used to monitor the subprocess' activity, and watch for stalling.
         """
         # TODO : debug this regex, worked in legacy, fails to match in new version
-        log_line_regex = r"\d{4}-\d{2}-\d{2}T(\d{2}:\d{2}:\d{2}\.\d{6})\+\d{4}\s.\s([A-Z]+)\s*.\s\w*:[^:]*:\d*\s-\s(.*)"  # noqa: E501
+        log_line_regex = r"\d{4}-\d{2}-\d{2}T(\d{2}:\d{2}:\d{2}\.\d{6})\+\d{4}\s.\s([A-Z]+)\s*.\s[\w.]*:[^:]*:\d*\s-\s(.*)"  # noqa: E501
         return log_line_regex
 
     @property
