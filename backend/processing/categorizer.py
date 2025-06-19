@@ -44,7 +44,10 @@ class CategorizerEngine:
         # messages_contents: List[str],
     ):
         # Set up the logger for the subprocess
-        logger_setup.configure_logger(force_log_file=LOG_FILE)
+        logger_setup.configure_logger(
+            # console_level="DEBUG",
+            force_log_file=LOG_FILE,
+        )
         logger.info("Subprocess logger set up")
 
         logger.info("Setting up utils")
@@ -128,7 +131,13 @@ class CategorizerEngine:
             llm_processed += 1
             logger.debug(f"Categorizing message {message_id}")
             try:
-                categories = categorizer_model.categorize(message_content)
+                categories = categorizer_model.categorize(
+                    message_content,
+                    max_output_length=25,
+                    safety_input_length=2048,
+                )  # Do NOT FORGET TO SET THE MAXIMUM OUTPUT LENGTH
+                # This omission can lead to excessive processing times and memory usage.
+                # With 5 beams full search, this can be VERY, VERY expensive real fast.
                 logger.debug(f"Categories for message {message_id}: {categories}")
             except categorizer_model.ExceedingSafetyLimitError as e:
                 categories = [BLACKLIST_TAG]
@@ -265,7 +274,7 @@ class CategorizerEngine:
             raise ValueError(f"Failed to parse log line: {line}")
         return parsed.groups()[0], parsed.groups()[1]
 
-    def check_for_timeouts(self) -> None | str:
+    def check_for_timeouts(self, offset: int) -> None | str:
         """
         Reads the log files to detect subprocess stalling,
         and if so returns the faulty message's id
@@ -276,24 +285,17 @@ class CategorizerEngine:
         """
         with open(self.ongoing_log_file, "r") as f:
             log_content = f.readlines()
-        last_index = -1
-        while last_index >= -10:
-            try:
-                self.parse_log_line(log_content[last_index])
-                break
-            except ValueError:
-                # If the line cannot be parsed, it is not a valid log line
-                last_index -= 1
-                continue
-            except IndexError:
-                # If the index is out of range, we have reached the beginning of the file
-                # It is likely too early to check for stalling
-                return None
-        if last_index < -10:
-            logger.warning(
-                "Could not find a valid log line in the last 10 lines of the log file. "
-                "Assuming no stalling."
-            )
+        last_index = (
+            -(offset * 3) - 1
+        )  # Ignore the last `3*offset` lines, which are info logs on the ongoing stall
+        try:
+            self.parse_log_line(log_content[last_index])
+        except ValueError:
+            # If the line cannot be parsed, it is not a valid log line
+            last_index -= 1
+        except IndexError:
+            # If the index is out of range, we have reached the beginning of the file
+            # It is likely too early to check for stalling
             return None
 
         # We have a valid log line, now we can check the last time it was logged
@@ -302,7 +304,9 @@ class CategorizerEngine:
         date_last_time = datetime.datetime.strptime(str_last_time, "%H:%M:%S.%f")
         if (datetime.datetime.now() - date_last_time).seconds > self.stalling_timeout:
             # The last log entry is older than the timeout
-            id_match = re.search(self.log_line_hunt_id, log_content[-4])
+            id_matches = [re.search(self.log_line_hunt_id, log_content[-i]) for i in range(1, 12)]
+            # Search for the first match in the last 12 lines
+            id_match = next((match for match in id_matches if match), None)
             if id_match:
                 return id_match.groups()[0]
             else:
@@ -343,9 +347,8 @@ class CategorizerEngine:
             terminated = False
             while subprocess.is_alive():
                 sleep(10)
-                faulty_id = self.check_for_timeouts()
+                faulty_id = self.check_for_timeouts(offset=non_faulty_stalls)
                 if faulty_id is None:
-                    non_faulty_stalls = 0  # There is no stalling, reset the counter
                     continue
                 elif faulty_id == NO_STALLING_ID:
                     non_faulty_stalls += 1

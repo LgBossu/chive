@@ -450,7 +450,7 @@ class MetafileWriter:
         """
         if self.sqlite_connection:
             self.sqlite_connection.close()
-            logger.info("Dynamic tags database connection closed")
+            logger.trace("Dynamic tags database connection closed")
         else:
             logger.warning("Dynamic tags database connection was already closed")
 
@@ -459,7 +459,7 @@ class MetafileWriter:
         Destructor to ensure the database connection is closed when the object is deleted.
         """
         self.close_dynamic_tags_db()
-        logger.info(
+        logger.debug(
             f"MetafileWriter instance {self.__repr__()} deleted, database connection closed"
         )
 
@@ -524,7 +524,7 @@ class MetafileQuerier:
         """
         if self.sqlite_connection:
             self.sqlite_connection.close()
-            logger.info("Dynamic tags database connection closed")
+            logger.trace("Dynamic tags database connection closed")
         else:
             logger.warning("Dynamic tags database connection was already closed")
 
@@ -533,7 +533,7 @@ class MetafileQuerier:
         Destructor to ensure the database connection is closed when the object is deleted.
         """
         self.close_dynamic_tags_db()
-        logger.info(
+        logger.debug(
             f"MetafileQuerier instance {self.__repr__()} deleted, database connection closed"
         )
 
