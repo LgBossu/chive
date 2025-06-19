@@ -12,7 +12,7 @@ from backend.loaders.metafiles_handlers import (
     MetafileQuerier,
     MetafileWriter,
 )
-from backend.models.categorizer_model import Categorizer0, CategorizerModel
+from backend.models.categorizer_model import AvailableCategorizers, CategorizerModel
 
 
 def display_time(seconds: float, tz: int = 1, duration: bool = False) -> str:
@@ -32,7 +32,11 @@ class CategorizerEngine:
     to control stalling on difficult messages.
     """
 
-    def __init__(self, categorizer_model: CategorizerModel, metafile_writer: MetafileWriter):
+    def __init__(
+        self,
+        categorizer_model: AvailableCategorizers,
+        metafile_writer: MetafileWriter,
+    ) -> None:
         """
         Initializes the CategorizerEngine with a given categorizer model.
 
@@ -170,6 +174,9 @@ class CategorizerEngine:
         :param max_output_length_override: Optional maximum length of the output categories.
         :param timeout_override: Optional timeout for the categorization process.
         """
+        # TODO : absolutely refactor this method. The wrong script was refactored from legacy,
+        # script logic is faulty due to abusive passing of XPU-bound objects to multiprocessing.
+
         logger.info(f"Batch categorizing {len(messages)} messages...")
 
         # Logging-relevant variables
@@ -334,6 +341,10 @@ class AutoCategorizerEngine(CategorizerEngine):
             self.categorize_empty_batch(uncategorized_empty)
 
         # Step 3: Categorize non-empty messages
+        raise NotImplementedError(
+            "Categorization of non-empty messages is not implemented yet. "
+            "Please implement the categorization logic in the subclass."
+        )
         if uncategorized_nonempty:
             self.categorize_batch(uncategorized_nonempty)
 
@@ -368,5 +379,4 @@ if __name__ == "__main__":
         chroma_querier=ChromaQuerier(),
     )
     # Run the categorization pipeline
-    logger.info("Starting categorization pipeline...")
     categorizer.pipeline()
