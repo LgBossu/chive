@@ -52,6 +52,17 @@ class MessageNode:
         """Returns True if the message node is a leaf node (no successors), False otherwise."""
         return len(self.next) == 0
 
+    @property
+    def empty_or_non_text(self) -> bool:
+        """Returns True if the message node is flagged as empty, False otherwise."""
+        is_empty_flag = self._metadata.get("empty_or_non_text", None)
+        if is_empty_flag is None:
+            raise ValueError("The 'empty_or_non_text' flag is not set in the metadata.")
+        assert isinstance(
+            is_empty_flag, bool
+        ), f"The 'empty_or_non_text' flag must be a boolean, and was not recognized as such (got {type(is_empty_flag)})."  # noqa: E501
+        return is_empty_flag
+
     def set_prev(self, prev_node: "MessageNode") -> None:
         """Sets the previous node in the conversation tree."""
         self.prev = prev_node
