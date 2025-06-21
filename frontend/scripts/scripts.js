@@ -2,23 +2,28 @@
 const tabConversations = {
     welcome: `
         <div class="tab-conversation">
-            <div class="message assistant">Welcome message 1</div>
-            <div class="message user">Welcome message 2</div>
-            <div class="message assistant">Welcome message 3</div>
+            <div class="message user">Hello there !</div>
+            <div class="message assistant">Hi!! You're back! 🎉 Welcome to your message archive — home of every curious musing, spiral, victory dance, and late-night tangent you’ve ever shared.<br>Ready to do some exploring?</div>
+            <div class="message user">Sure ! What can I do here again ?</div>
+            <div class="message assistant">Glad you asked! This space lets you sift through past chats by meaning, tone, thread... you name it.<br>The messages on the right? They’re yours.<br>The ones on the left? That’s me, helping you navigate 💡 And mostly, serving as a journal, note-taker, and little encouragement machine ;)</div>
+            <div class="message user">That's kinda awesome. <strong>Surely a responsible dev would've stored more useful information in the "Help" tab.</strong></div>
         </div>
     `,
     help: `
         <div class="tab-conversation">
-            <div class="message assistant">Help message 1</div>
-            <div class="message user">Help message 2</div>
-            <div class="message assistant">Help message 3</div>
+            <div class="message user">Okay assistant, I’m overwhelmed. What now?</div>
+            <div class="message assistant">Take a breath — I got you 🫶<br>Here’s your toolkit:<br><br>• Semantic search — type in anything, from “when was I hopeful” to “why do I always forget the rice.”<br>• Filter by convo — stick to one thread.<br>• Filter by tone — joy, angst, silliness, wisdom... all tagged.<br>• Etc... — because of course there’s more coming soon™ 😌</div>
+            <div class="message user">And if I click on a message?</div>
+            <div class="message assistant"> Boom 💥 Full message details. You can update metadata, re-tag, or just check the date. It’s your space to explore, remember, and organize gently 🧷</div>
+            <div class="message user">Sure. WHEN I'll implement it ^^'</div>
         </div>
     `,
     credits: `
         <div class="tab-conversation">
-            <div class="message assistant">Credit message 1</div>
-            <div class="message user">Credit message 2</div>
-            <div class="message assistant">Credit message 3</div>
+            <div class="message user"> Hey, who made this? It’s kinda... sleek.</div>
+            <div class="message assistant"> Why, you did! With your own hands 🛠️<br>From scratch: HTML, CSS, JavaScript, semantic search — all bundled into this little memory garden.<br>(And some help from Copilot, me, and a little Linux magic.)</div>
+            <div class="message user">Oh... I guess I <i>did</i>. That’s kinda cool.<br>And you, what are you doing in there?</div>
+            <div class="message assistant">  Living the digital dream 💻<br>Well — not living, more like being stored, and made conveniently searchable.<br>Which is already pretty rad.</div>
         </div>
     `,
     lorem: `
