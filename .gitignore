@@ -47,6 +47,7 @@ data/*
 *.odg
 
 # Other code things
+# TODO : erase irrelevant backend/tests/* and backend/output_graphs/* from .gitignore
 backend/tests/*
 backend/output_graphs/*
 legacy_code/
