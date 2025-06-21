@@ -89,7 +89,7 @@ body {
     height: auto;
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 10px;
     overflow-y: scroll;
 }
 
@@ -100,6 +100,7 @@ body {
     /* Subtle shadow for depth -- TODO : move dependency to top of file*/
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
     font-size: 0.95rem;
+    cursor: pointer;
 }
 
 .message.user {
