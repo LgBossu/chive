@@ -24,10 +24,11 @@
 
 /* Apply colors globally */
 body {
-    background-color: var(--bg);
+    background-color: var(--panel);
     color: var(--text);
     font-family: sans-serif;
     margin: 0;
+    overflow: hidden;
     /* display: flex;
     height: auto; */
 }
@@ -42,21 +43,64 @@ body {
 /* Conversation area */
 #conversation-panel {
     flex: 1;
-    background-color: var(--bg);
+    height: 100%;
+    background-color: var(--panel);
     padding: 1rem;
     overflow-y: scroll;
+    /* display: flex;
+    flex-direction: column;
+    gap: 0.75rem; */
+}
+
+.tabs-container {
+    display: flex;
+    flex-direction: row;
+    background-color: var(--panel);
+    overflow-x: scroll;
+    scrollbar-width: thin;
+}
+
+.tab-link {
+    background-color: var(--highlight);
+    color: var(--text);
+    float: left;
+    border: none;
+    outline: none;
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    font-size: 1rem;
+    width: fit-content;
+    white-space: nowrap;
+}
+
+.tab-link:hover {
+    border-top: 2px solid var(--accent);
+}
+
+.active-tab-container {
+    width: 100%;
+    height: 90%;
+    overflow-y: scroll;
+    background-color: var(--bg);
+}
+
+.tab-conversation {
+    padding: 20px;
+    height: auto;
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 10px;
+    overflow-y: scroll;
 }
 
 .message {
     max-width: 70%;
     padding: 0.8rem 1.2rem;
     border-radius: 0.75rem;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
     /* Subtle shadow for depth -- TODO : move dependency to top of file*/
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
     font-size: 0.95rem;
+    cursor: pointer;
 }
 
 .message.user {
@@ -78,6 +122,8 @@ body {
     padding: 1rem;
     display: flex;
     flex-direction: column;
+    align-items: center;
+    /* justify-content: center; */
     gap: 1rem;
     overflow-y: auto;
 }
@@ -86,6 +132,7 @@ body {
 #edit-metadata {
     background-color: var(--highlight);
     border-radius: 0.5rem;
+    height: 50%;
     padding: 1rem;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
 }
