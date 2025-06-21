@@ -1,3 +1,5 @@
+// TODO : refactor this file to separate multiple functionalities and base content in multiple files.
+
 // Store the associated tab conversations in a JS object.
 const tabConversations = {
     welcome: `
