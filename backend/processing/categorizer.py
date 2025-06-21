@@ -17,6 +17,9 @@ from backend.loaders.metafiles_handlers import (
 from backend.models.categorizer_model import Categorizer0, CategorizerModel
 from backend.utils.log_setup import LoggerSetup
 
+# TODO : maybe shard the databases and categorization process
+# to avoid memory issues when and if the project scales up.
+
 NO_STALLING_ID = "[NotAnId]"
 
 
