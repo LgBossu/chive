@@ -14,9 +14,18 @@
     <div id="app-container">
 
         <div id="conversation-panel">
-            <div class="message assistant">Assistant message</div>
-            <div class="message user">User message</div>
-            <div class="message assistant">Assistant message</div>
+            <!-- Clickable tabs -- each button now has a data-tab attribute -->
+            <div id="tabslist-container" class="tabs-container">
+                <button id="welcomeTab" class="tab-link active" data-tab="welcome">Welcome</button>
+                <button id="defaultHelp" class="tab-link" data-tab="help">Help</button>
+                <button id="creditsTab" class="tab-link" data-tab="credits">Credits</button>
+                <!-- <button id="reallyLongTab" class="tab-link" data-tab="lorem">Really Long Tab filled with lorem ipsum
+                    that will just tend to overflow the tabs bar for testing and tuning purposes</button> -->
+            </div>
+            <!-- Active conversation container -->
+            <div class="active-tab-container" id="active-viewer">
+                <!-- This content will be replaced by the selected tab conversation -->
+            </div>
         </div>
 
         <div id="side-panel">
@@ -38,6 +47,9 @@
         </div>
 
     </div>
+
+    <!-- Include your scripts file -->
+    <script src="scripts/scripts.js"></script>
 </body>
 
 
