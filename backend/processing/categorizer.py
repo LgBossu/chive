@@ -6,6 +6,7 @@ from time import sleep, time
 from typing import Optional
 
 from loguru import logger
+from requests import ConnectionError, HTTPError, post
 
 from backend.loaders.chroma_endpoints import ChromaQuerier
 from backend.loaders.metafiles_handlers import (
@@ -14,6 +15,7 @@ from backend.loaders.metafiles_handlers import (
     MetafileQuerier,
     MetafileWriter,
 )
+from backend.models.app_models import CategorizerJobInfo, JobStatus
 from backend.models.categorizer_model import Categorizer0, CategorizerModel
 from backend.utils.log_setup import LoggerSetup
 
@@ -37,6 +39,7 @@ def display_time(seconds: float, tz: int = 1, duration: bool = False) -> str:
 class CategorizerEngine:
     @staticmethod
     def categorization_loop(
+        job_id: str,
         LOG_FILE: Path,
         logger_setup: LoggerSetup,
         categorizer_model_type: type[CategorizerModel],  # Lets the user specify
@@ -50,6 +53,45 @@ class CategorizerEngine:
         logger.info("Subprocess logger set up")
 
         logger.info("Setting up utils")
+
+        # Define post utility
+        from requests import ConnectionError, HTTPError, post
+
+        from backend.models.app_models import CategorizerJobInfo, JobStatus
+
+        def post_status(
+            total_messages: int,
+            processed_messages: int,
+            eta: str,
+            last_update: Optional[float] = None,
+            current_message_id: Optional[str] = None,
+            current_speed: Optional[float] = None,
+        ) -> None:
+            """
+            Posts the job info to the specified URL.
+            This is used to update the job status and progress in the metafile.
+            """
+            # TODO : refactor the code below to use the API after every finished message.
+            # This will allow to update the job status and progress in real-time,
+            url: str = "http://localhost:8000/update_jobinfo"
+            job_info = CategorizerJobInfo(
+                job_id=job_id,
+                status=JobStatus.RUNNING,
+                total_messages=total_messages,
+                processed_messages=processed_messages,
+                eta=eta,
+                last_update=last_update if last_update is not None else time(),
+                current_message_id=current_message_id,
+                current_speed=current_speed,
+            )
+            try:
+                post(url, json=job_info.model_dump())
+            except HTTPError as e:
+                logger.error(f"Failed to post job progress: {e}")
+            except ConnectionError as e:
+                logger.error(
+                    f"Failed to connect to the job progress endpoint: {e}. Is the server running?"
+                )
 
         # Define time display utility
         def display_time(seconds: float, tz: int = 1, duration: bool = False) -> str:
@@ -202,6 +244,7 @@ class CategorizerEngine:
 
     def __init__(
         self,
+        job_id: str,
         override_categorizer_model: Optional[type[CategorizerModel]] = None,
         stalling_timeout: int = 30,
         non_faulty_stalls_max: int = 4,
@@ -210,6 +253,9 @@ class CategorizerEngine:
         Initializes the categorizer engine.
         This is a wrapper for the categorization loop.
         """
+        # Set the job ID
+        self.job_id = job_id
+
         # Set up the logger
         self.ongoing_log_file = LoggerSetup.configure_logger()
 
@@ -265,6 +311,35 @@ class CategorizerEngine:
         log_line_hunt_id = r"Categorizing message ([0-9a-f]{64})"
         return log_line_hunt_id
 
+    # Posting info on the running job
+    def post_progress(self):
+        """
+        Posts the progress of the categorization job to the appropriate API endpoint.
+        This is used to update the job status and progress in the metafile.
+        """
+        job_info = CategorizerJobInfo(
+            job_id=self.job_id,
+            status=JobStatus.RUNNING,
+            total_messages=None,  # This will be set later
+            processed_messages=None,  # This will be set later
+            eta=None,  # This will be set later
+            last_update=time(),
+            current_message_id=None,  # This will be set later
+            current_speed=None,  # This will be set later
+        )
+        try:
+            post(
+                "http://localhost:8000/update_jobinfo",  # TODO : do not hardcode the actual job URL
+                json=job_info.model_dump(),
+            )
+        except HTTPError as e:
+            logger.error(f"Failed to post job progress: {e}")
+        except ConnectionError as e:
+            logger.error(
+                f"Failed to connect to the job progress endpoint: {e}. Is the server running?"
+            )
+
+    # Util functions to factorize the code
     def parse_log_line(self, line: str) -> tuple[str, str]:
         """Parses a line from the log file"""
         parsed = re.match(self.log_line_regex, line)
@@ -282,6 +357,7 @@ class CategorizerEngine:
         :param timeout: Timeout in seconds to consider a subprocess stalled
         :return: The ID of the message that caused the stalling, or None if no stalling is detected.
         """
+        # TODO : refactor absolutely this function to use the API instead of text logs.
         with open(self.ongoing_log_file, "r") as f:
             log_content = f.readlines()
         last_index = (
@@ -317,6 +393,7 @@ class CategorizerEngine:
         else:
             return None
 
+    # Launching and running the categorization process
     def launch_categorization(self) -> Process:
         logger.info(f"Starting subprocess - logging to {self.ongoing_log_file}")
 
@@ -334,6 +411,7 @@ class CategorizerEngine:
 
     def run_categorization(self) -> None:
         logger.info("Setting up persistent categorization")
+        self.post_progress()
         while True:
             non_faulty_stalls = 0
             # TODO : check where ELSE non_faulty_stalls needs to be reset, if at all.
@@ -403,5 +481,5 @@ if __name__ == "__main__":
 
     # RUN AUTOMATIC CATEGORIZER PIPELINE
     logger.info("Running automatic categorizer pipeline...")
-    categorizer_engine = CategorizerEngine()
+    categorizer_engine = CategorizerEngine(job_id="DEBUG")
     categorizer_engine.run_categorization()
