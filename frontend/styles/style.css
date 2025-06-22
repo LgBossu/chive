@@ -3,7 +3,7 @@
     --bg: #1e1e1e;
     --panel: #2c2c2c;
     --highlight: #3a3a3a;
-    --text: #e0e0e0;
+    --text: #f1f1f1;
     --user: #c88e31;
     --assistant: #b15050;
     --accent: #6bb7ff;
@@ -22,6 +22,10 @@
     }
 }
 
+html {
+    height: 100%;
+}
+
 /* Apply colors globally */
 body {
     background-color: var(--panel);
@@ -29,14 +33,39 @@ body {
     font-family: sans-serif;
     margin: 0;
     overflow: hidden;
-    /* display: flex;
-    height: auto; */
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    height: 100%;
 }
+
+.nav-bar {
+    background-color: var(--bg);
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.nav-bar.nav-button {
+    background-color: var(--bg);
+    color: var(--text);
+    padding: 0.5rem 1.2rem;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+}
+
+.nav-bar.nav-button:hover {
+    background-color: var(--highlight);
+}
+
 
 /* Root layout */
 #app-container {
     display: flex;
-    height: 100vh;
+    height: 100%;
     font-family: sans-serif;
 }
 
@@ -46,7 +75,7 @@ body {
     height: 100%;
     background-color: var(--panel);
     padding: 1rem;
-    overflow-y: scroll;
+    display: block;
     /* display: flex;
     flex-direction: column;
     gap: 0.75rem; */
@@ -71,6 +100,7 @@ body {
     font-size: 1rem;
     width: fit-content;
     white-space: nowrap;
+    border-top: 2px solid transparent;
 }
 
 .tab-link:hover {
@@ -79,7 +109,8 @@ body {
 
 .active-tab-container {
     width: 100%;
-    height: 90%;
+    height: 85%;
+    display: block;
     overflow-y: scroll;
     background-color: var(--bg);
 }
@@ -118,6 +149,7 @@ body {
 /* Sidebar */
 #side-panel {
     width: 320px;
+    height: 100%;
     background-color: var(--panel);
     padding: 1rem;
     display: flex;
@@ -125,14 +157,14 @@ body {
     align-items: center;
     /* justify-content: center; */
     gap: 1rem;
-    overflow-y: auto;
+    overflow-y: scroll;
 }
 
 #search-database,
 #edit-metadata {
     background-color: var(--highlight);
     border-radius: 0.5rem;
-    height: 50%;
+    height: 40%;
     padding: 1rem;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
 }
