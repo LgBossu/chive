@@ -27,7 +27,7 @@ async def launch_job():
 @app.post("/update_jobinfo")
 async def update_jobinfo(update: CategorizerJobInfo):
     job_info_cache[update.job_id] = update
-    # Figure out better logic for updating the job info, notably,
+    # TODO: Figure out better logic for updating the job info, notably,
     # - incrementing the processed messages,
     # - keeping the original estimate of total messages,
     # etc.

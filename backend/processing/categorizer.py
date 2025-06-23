@@ -73,7 +73,9 @@ class CategorizerEngine:
             """
             # TODO : refactor the code below to use the API after every finished message.
             # This will allow to update the job status and progress in real-time,
-            url: str = "http://localhost:8000/update_jobinfo"
+            url: str = (
+                "http://localhost:8000/update_jobinfo"  # TODO : do not hardcode the actual job URL
+            )
             job_info = CategorizerJobInfo(
                 job_id=job_id,
                 status=JobStatus.RUNNING,
@@ -121,8 +123,6 @@ class CategorizerEngine:
         logger.debug(f"Already tagged messages: {list(already_tagged_messages)[:10]}...")
 
         # Get the messages to categorize
-        # TODO : debug set operations and metafiles querier :
-        # we produce duplicate messages to categorize
         logger.debug("Retrieving messages to categorize")
         nonempty_array = chroma_querier.get_all_nonempty_messages()
         nonempty_uncategorized = [
@@ -146,7 +146,7 @@ class CategorizerEngine:
                         message_id=message_id,
                         tags=[EMPTY_TAG],
                         check_for_duplicates=True,  # Should not happen.
-                        # TODO : check that it is not needed and deprecate
+                        # TODO : check that it is not needed and deprecate. It is marginally costly.
                     )
                     logger.debug(f"Tags written for empty message {message_id}: [{EMPTY_TAG}]")
                 except RuntimeError as e:
@@ -299,7 +299,6 @@ class CategorizerEngine:
         Regex to match the log lines produced by the categorizer.
         This is used to monitor the subprocess' activity, and watch for stalling.
         """
-        # TODO : debug this regex, worked in legacy, fails to match in new version
         log_line_regex = r"\d{4}-\d{2}-\d{2}T(\d{2}:\d{2}:\d{2}\.\d{6})\+\d{4}\s.\s([A-Z]+)\s*.\s[\w.]*:[^:]*:\d*\s-\s(.*)"  # noqa: E501
         return log_line_regex
 
@@ -444,7 +443,7 @@ class CategorizerEngine:
                         message_id=faulty_id,
                         tags=[BLACKLIST_TAG],
                         check_for_duplicates=True,  # Should not happen.
-                        # TODO : check that it is not needed and deprecate
+                        # TODO : check that it is not needed and deprecate. It is marginally costly.
                     )
                     subprocess.terminate()
                     terminated = True

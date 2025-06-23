@@ -233,7 +233,7 @@ class CategorizerModel(ABC):
         :param output: The raw output from the model.
         :return: The cleaned output string.
         """
-        # TODO : implement this method in subclasses to provide specific cleaning logic.
+        # implement this method in subclasses to provide specific cleaning logic.
         pass
 
     @abstractmethod
@@ -244,7 +244,7 @@ class CategorizerModel(ABC):
         :param output: The cleaned output string.
         :return: A list of categories extracted from the output.
         """
-        # TODO : implement this method in subclasses to provide specific parsing logic.
+        # implement this method in subclasses to provide specific parsing logic.
         pass
 
     def categorize(

@@ -56,7 +56,7 @@ class MessageMetadata:
     cur_id: str
     parent_id: str | None
     children_ids: List[str]
-    timestamp: float | str | None
+    timestamp: float | str
     # TODO : CONSIDER CONVERTING THE NONE TIMESTAMP TO THE 0.0 FLOAT VALUE FOR CONSISTENCY,
     # OR A BOOL.
 
