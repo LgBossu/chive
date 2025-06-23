@@ -59,30 +59,33 @@ class CategorizerEngine:
 
         from backend.models.app_models import CategorizerJobInfo, JobStatus
 
-        def post_status(
-            total_messages: int,
-            processed_messages: int,
-            eta: str,
-            last_update: Optional[float] = None,
+        def post_status_after_message(
+            eta: Optional[str] = None,
             current_message_id: Optional[str] = None,
             current_speed: Optional[float] = None,
+            last_update: Optional[float] = None,
+            processed_messages: int = 1,  # Increment processed messages by 1
         ) -> None:
             """
             Posts the job info to the specified URL.
             This is used to update the job status and progress in the metafile.
+
+            A priori, this function is called after every processed message, no more, no less.
             """
             # TODO : refactor the code below to use the API after every finished message.
             # This will allow to update the job status and progress in real-time,
             url: str = (
                 "http://localhost:8000/update_jobinfo"  # TODO : do not hardcode the actual job URL
             )
+            if last_update is None:
+                last_update = time()
             job_info = CategorizerJobInfo(
                 job_id=job_id,
                 status=JobStatus.RUNNING,
-                total_messages=total_messages,
+                total_messages=None,  # This was set at the beginning of the job
                 processed_messages=processed_messages,
                 eta=eta,
-                last_update=last_update if last_update is not None else time(),
+                last_update=last_update,
                 current_message_id=current_message_id,
                 current_speed=current_speed,
             )
@@ -161,10 +164,29 @@ class CategorizerEngine:
         llm_processed = 0
 
         logger.info(f"Starting categorization process at {display_time(starting_time)}")
+        first_message = True
         for message_id, message_content in nonempty_uncategorized:
             message_start_time = time()
             total_processed += 1
 
+            if first_message:
+                post_status_after_message(
+                    processed_messages=0,  # No messages processed yet
+                )
+                first_message = False
+            else:
+                average_processing_time = (
+                    sum(processing_times) / len(processing_times) if processing_times else 0
+                )
+                post_status_after_message(
+                    current_message_id=message_id,
+                    current_speed=average_processing_time,  # Average processing time  # noqa: E501
+                    last_update=message_start_time,
+                    eta=display_time(
+                        average_processing_time * (len(nonempty_uncategorized) - total_processed),
+                        duration=True,
+                    ),
+                )
             if message_id in already_tagged_messages:
                 logger.trace(f"Message {message_id} already seen, skipping.")
                 continue
@@ -311,7 +333,12 @@ class CategorizerEngine:
         return log_line_hunt_id
 
     # Posting info on the running job
-    def post_progress(self):
+    def post_progress(
+        self,
+        total_messages: int,
+        processed_messages: int = 0,
+        eta: Optional[str] = None,
+    ) -> None:
         """
         Posts the progress of the categorization job to the appropriate API endpoint.
         This is used to update the job status and progress in the metafile.
@@ -319,9 +346,9 @@ class CategorizerEngine:
         job_info = CategorizerJobInfo(
             job_id=self.job_id,
             status=JobStatus.RUNNING,
-            total_messages=None,  # This will be set later
-            processed_messages=None,  # This will be set later
-            eta=None,  # This will be set later
+            total_messages=total_messages,  # This will be set later
+            processed_messages=processed_messages,  # This will be set later
+            eta=eta,  # This will be set later
             last_update=time(),
             current_message_id=None,  # This will be set later
             current_speed=None,  # This will be set later
@@ -409,8 +436,14 @@ class CategorizerEngine:
         return categorization_process
 
     def run_categorization(self) -> None:
+        # Get initial job information
+        logger.info("Retrieving initial job information")
+        already_tagged_messages = set(MetafileQuerier().get_all_tagged_ids())
+        nonempty_array = ChromaQuerier().get_all_nonempty_messages()
+        total_nonempty_uncategorized = len(set(nonempty_array[:, 0]) - already_tagged_messages)
+        self.post_progress(total_messages=total_nonempty_uncategorized)
+
         logger.info("Setting up persistent categorization")
-        self.post_progress()
         while True:
             non_faulty_stalls = 0
             # TODO : check where ELSE non_faulty_stalls needs to be reset, if at all.
