@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Dict
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.app_actions import update_db
@@ -80,6 +81,11 @@ def update_job_info_cache(job_id: str, job_info: CategorizerJobInfo):
             existing_job_info.current_message_id = job_info.current_message_id
         if job_info.current_speed is not None:
             existing_job_info.current_speed = job_info.current_speed
+
+
+@app.get("/favicon.ico")
+async def favicon():
+    return FileResponse("icon/placeholder.ico")
 
 
 @app.get("/")
