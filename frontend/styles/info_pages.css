@@ -1,0 +1,61 @@
+/* Container for standalone info pages */
+.info-container {
+    padding: 1.5rem;
+    background-color: var(--panel);
+    /* Inherits the global panel background */
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    margin: 1rem auto;
+    max-width: 800px;
+}
+
+/* Header styling specific to info pages */
+.info-header {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+    text-align: center;
+    color: var(--text);
+}
+
+/* A panel to display status messages or API updates */
+.info-panel {
+    padding: 1rem;
+    background-color: var(--bg);
+    /* Use the global background variable for a contrasting look */
+    color: var(--text);
+    border-left: 4px solid var(--accent);
+    margin: 1rem 0;
+    border-radius: 0.5rem;
+}
+
+/* Container for API action buttons */
+.api-button-container {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+/* Styling for textual API action buttons */
+.api-action-button {
+    background-color: var(--accent);
+    border: none;
+    border-radius: 0.4rem;
+    color: var(--text);
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.api-action-button:hover {
+    background-color: #267acc;
+    /* manually defined hover color */
+}
+
+/* Optionally, a simple informational text panel */
+.info-text {
+    font-size: 0.95rem;
+    line-height: 1.5;
+    margin: 0.5rem 0;
+}

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<!-- This is the main page of the prototype interface. It serves as a placeholder
+     and will be expanded with links to functional search pages and other features
+     as the project develops. -->
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Database toolkit</title>
+    <link rel="stylesheet" href="styles/style.css" />
+    <link rel="stylesheet" href="styles/info_pages.css" />
+</head>
+
+<body>
+    <div class="nav-bar">
+        <button id="homeButton" class="nav-bar nav-button" onclick="window.location.href='index.html'">
+            Home
+        </button>
+        <button id="databaseButton" class="nav-bar nav-button" onclick="window.location.href='update_database.html'"
+            disabled style="border-top: 2px solid var(--accent);">
+            Database
+        </button>
+        <button id="appButton" class="nav-bar nav-button" onclick="window.location.href='search_app.html'">
+            Search app
+        </button>
+    </div>
+
+    <div class="info-container">
+        <h1 class="info-header">Database Management</h1>
+        <div class="info-panel">
+            <p>The database is currently idle.</p>
+        </div>
+        <div class="api-button-container">
+            <button class="api-action-button" onclick="postDatabaseUpdate()">Update Database</button>
+            <button class="api-action-button" onclick="fetchUpdateDatabaseStatus()">Check Status</button>
+        </div>
+        <div class="info-text">
+            <p>This panel shows responses from the API endpoint.</p>
+        </div>
+    </div>
+
+    <!-- Include your scripts file -->
+    <script src="scripts/scripts.js"></script>
+</body>
+
+
+</html>

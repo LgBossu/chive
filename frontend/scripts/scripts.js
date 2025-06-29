@@ -1,3 +1,5 @@
+// TODO : refactor this file to separate multiple functionalities and base content in multiple files.
+
 // Store the associated tab conversations in a JS object.
 const tabConversations = {
     welcome: `
@@ -107,7 +109,7 @@ function switchTab(e) {
     document.querySelectorAll('.tab-link').forEach(button => {
         button.style.backgroundColor = getComputedStyle(document.documentElement)
             .getPropertyValue('--highlight');
-        button.style.borderTop = '2px solid transparent';
+        button.style.borderTop = '';
     });
     // Set the clicked button to the --bg color.
     clickedButton.style.backgroundColor = getComputedStyle(document.documentElement)
