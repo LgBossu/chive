@@ -6,6 +6,7 @@ from time import sleep, time
 from typing import Optional
 
 from loguru import logger
+from requests import ConnectionError, HTTPError, post
 
 from backend.loaders.chroma_endpoints import ChromaQuerier
 from backend.loaders.metafiles_handlers import (
@@ -14,6 +15,7 @@ from backend.loaders.metafiles_handlers import (
     MetafileQuerier,
     MetafileWriter,
 )
+from backend.models.app_models import CategorizerJobInfo, JobStatus
 from backend.models.categorizer_model import Categorizer0, CategorizerModel
 from backend.utils.log_setup import LoggerSetup
 
@@ -37,6 +39,7 @@ def display_time(seconds: float, tz: int = 1, duration: bool = False) -> str:
 class CategorizerEngine:
     @staticmethod
     def categorization_loop(
+        job_id: str,
         LOG_FILE: Path,
         logger_setup: LoggerSetup,
         categorizer_model_type: type[CategorizerModel],  # Lets the user specify
@@ -50,6 +53,50 @@ class CategorizerEngine:
         logger.info("Subprocess logger set up")
 
         logger.info("Setting up utils")
+
+        # Define post utility
+        from requests import ConnectionError, HTTPError, post
+
+        from backend.models.app_models import CategorizerJobInfo, JobStatus
+
+        def post_status_after_message(
+            eta: Optional[str] = None,
+            current_message_id: Optional[str] = None,
+            current_speed: Optional[float] = None,
+            last_update: Optional[float] = None,
+            processed_messages: int = 1,  # Increment processed messages by 1
+        ) -> None:
+            """
+            Posts the job info to the specified URL.
+            This is used to update the job status and progress in the metafile.
+
+            A priori, this function is called after every processed message, no more, no less.
+            """
+            # TODO : refactor the code below to use the API after every finished message.
+            # This will allow to update the job status and progress in real-time,
+            url: str = (
+                "http://localhost:8000/update_jobinfo"  # TODO : do not hardcode the actual job URL
+            )
+            if last_update is None:
+                last_update = time()
+            job_info = CategorizerJobInfo(
+                job_id=job_id,
+                status=JobStatus.RUNNING,
+                total_messages=None,  # This was set at the beginning of the job
+                processed_messages=processed_messages,
+                eta=eta,
+                last_update=last_update,
+                current_message_id=current_message_id,
+                current_speed=current_speed,
+            )
+            try:
+                post(url, json=job_info.model_dump())
+            except HTTPError as e:
+                logger.error(f"Failed to post job progress: {e}")
+            except ConnectionError as e:
+                logger.error(
+                    f"Failed to connect to the job progress endpoint: {e}. Is the server running?"
+                )
 
         # Define time display utility
         def display_time(seconds: float, tz: int = 1, duration: bool = False) -> str:
@@ -79,8 +126,6 @@ class CategorizerEngine:
         logger.debug(f"Already tagged messages: {list(already_tagged_messages)[:10]}...")
 
         # Get the messages to categorize
-        # TODO : debug set operations and metafiles querier :
-        # we produce duplicate messages to categorize
         logger.debug("Retrieving messages to categorize")
         nonempty_array = chroma_querier.get_all_nonempty_messages()
         nonempty_uncategorized = [
@@ -104,7 +149,7 @@ class CategorizerEngine:
                         message_id=message_id,
                         tags=[EMPTY_TAG],
                         check_for_duplicates=True,  # Should not happen.
-                        # TODO : check that it is not needed and deprecate
+                        # TODO : check that it is not needed and deprecate. It is marginally costly.
                     )
                     logger.debug(f"Tags written for empty message {message_id}: [{EMPTY_TAG}]")
                 except RuntimeError as e:
@@ -119,10 +164,29 @@ class CategorizerEngine:
         llm_processed = 0
 
         logger.info(f"Starting categorization process at {display_time(starting_time)}")
+        first_message = True
         for message_id, message_content in nonempty_uncategorized:
             message_start_time = time()
             total_processed += 1
 
+            if first_message:
+                post_status_after_message(
+                    processed_messages=0,  # No messages processed yet
+                )
+                first_message = False
+            else:
+                average_processing_time = (
+                    sum(processing_times) / len(processing_times) if processing_times else 0
+                )
+                post_status_after_message(
+                    current_message_id=message_id,
+                    current_speed=average_processing_time,  # Average processing time  # noqa: E501
+                    last_update=message_start_time,
+                    eta=display_time(
+                        average_processing_time * (len(nonempty_uncategorized) - total_processed),
+                        duration=True,
+                    ),
+                )
             if message_id in already_tagged_messages:
                 logger.trace(f"Message {message_id} already seen, skipping.")
                 continue
@@ -202,6 +266,7 @@ class CategorizerEngine:
 
     def __init__(
         self,
+        job_id: str,
         override_categorizer_model: Optional[type[CategorizerModel]] = None,
         stalling_timeout: int = 30,
         non_faulty_stalls_max: int = 4,
@@ -210,6 +275,9 @@ class CategorizerEngine:
         Initializes the categorizer engine.
         This is a wrapper for the categorization loop.
         """
+        # Set the job ID
+        self.job_id = job_id
+
         # Set up the logger
         self.ongoing_log_file = LoggerSetup.configure_logger()
 
@@ -253,7 +321,6 @@ class CategorizerEngine:
         Regex to match the log lines produced by the categorizer.
         This is used to monitor the subprocess' activity, and watch for stalling.
         """
-        # TODO : debug this regex, worked in legacy, fails to match in new version
         log_line_regex = r"\d{4}-\d{2}-\d{2}T(\d{2}:\d{2}:\d{2}\.\d{6})\+\d{4}\s.\s([A-Z]+)\s*.\s[\w.]*:[^:]*:\d*\s-\s(.*)"  # noqa: E501
         return log_line_regex
 
@@ -265,6 +332,40 @@ class CategorizerEngine:
         log_line_hunt_id = r"Categorizing message ([0-9a-f]{64})"
         return log_line_hunt_id
 
+    # Posting info on the running job
+    def post_progress(
+        self,
+        total_messages: int,
+        processed_messages: int = 0,
+        eta: Optional[str] = None,
+    ) -> None:
+        """
+        Posts the progress of the categorization job to the appropriate API endpoint.
+        This is used to update the job status and progress in the metafile.
+        """
+        job_info = CategorizerJobInfo(
+            job_id=self.job_id,
+            status=JobStatus.RUNNING,
+            total_messages=total_messages,  # This will be set later
+            processed_messages=processed_messages,  # This will be set later
+            eta=eta,  # This will be set later
+            last_update=time(),
+            current_message_id=None,  # This will be set later
+            current_speed=None,  # This will be set later
+        )
+        try:
+            post(
+                "http://localhost:8000/update_jobinfo",  # TODO : do not hardcode the actual job URL
+                json=job_info.model_dump(),
+            )
+        except HTTPError as e:
+            logger.error(f"Failed to post job progress: {e}")
+        except ConnectionError as e:
+            logger.error(
+                f"Failed to connect to the job progress endpoint: {e}. Is the server running?"
+            )
+
+    # Util functions to factorize the code
     def parse_log_line(self, line: str) -> tuple[str, str]:
         """Parses a line from the log file"""
         parsed = re.match(self.log_line_regex, line)
@@ -282,6 +383,7 @@ class CategorizerEngine:
         :param timeout: Timeout in seconds to consider a subprocess stalled
         :return: The ID of the message that caused the stalling, or None if no stalling is detected.
         """
+        # TODO : refactor absolutely this function to use the API instead of text logs.
         with open(self.ongoing_log_file, "r") as f:
             log_content = f.readlines()
         last_index = (
@@ -317,6 +419,7 @@ class CategorizerEngine:
         else:
             return None
 
+    # Launching and running the categorization process
     def launch_categorization(self) -> Process:
         logger.info(f"Starting subprocess - logging to {self.ongoing_log_file}")
 
@@ -333,6 +436,13 @@ class CategorizerEngine:
         return categorization_process
 
     def run_categorization(self) -> None:
+        # Get initial job information
+        logger.info("Retrieving initial job information")
+        already_tagged_messages = set(MetafileQuerier().get_all_tagged_ids())
+        nonempty_array = ChromaQuerier().get_all_nonempty_messages()
+        total_nonempty_uncategorized = len(set(nonempty_array[:, 0]) - already_tagged_messages)
+        self.post_progress(total_messages=total_nonempty_uncategorized)
+
         logger.info("Setting up persistent categorization")
         while True:
             non_faulty_stalls = 0
@@ -366,7 +476,7 @@ class CategorizerEngine:
                         message_id=faulty_id,
                         tags=[BLACKLIST_TAG],
                         check_for_duplicates=True,  # Should not happen.
-                        # TODO : check that it is not needed and deprecate
+                        # TODO : check that it is not needed and deprecate. It is marginally costly.
                     )
                     subprocess.terminate()
                     terminated = True
@@ -403,5 +513,5 @@ if __name__ == "__main__":
 
     # RUN AUTOMATIC CATEGORIZER PIPELINE
     logger.info("Running automatic categorizer pipeline...")
-    categorizer_engine = CategorizerEngine()
+    categorizer_engine = CategorizerEngine(job_id="DEBUG")
     categorizer_engine.run_categorization()
