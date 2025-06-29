@@ -1,25 +1,50 @@
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from typing import Dict
 
 from fastapi import FastAPI, HTTPException
 
+from backend.app_actions import update_db
+
 # from pydantic import BaseModel, Field
-# from backend.loaders.chroma_endpoints import ChromaUpserter
-from backend.models.app_models import CategorizerJobInfo
-
-app = FastAPI()
+from backend.models.app_models import CategorizerJobInfo, JobStatus
 
 
-# In-memory cache for job information
-job_info_cache: Dict[str, CategorizerJobInfo] = {}
+@dataclass
+class Cache:
+    """
+    A simple dataclass to hold the in-memory cache.
+    This is used to store job information and update status.
+    """
+
+    job_info_cache: Dict[str, CategorizerJobInfo]
+    update_db_cache: JobStatus
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifespan event handler to set up shared state.
+    This is called when the application starts and stops.
+    """
+    # Initialize the standard cached info
+    app.state.cache = Cache(
+        job_info_cache=dict(),  # Initialize an empty cache for job info
+        update_db_cache=JobStatus.IDLE,  # Initialize the update status
+    )
+    yield
+    # Cleanup can be done here if needed
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 def update_job_info_cache(job_id: str, job_info: CategorizerJobInfo):
     """
     Update the in-memory cache with the job information.
     """
+    job_info_cache: Dict[str, CategorizerJobInfo] = app.state.cache.job_info_cache
     if job_id not in job_info_cache:
-        # If the job_id does not exist, we add it to the cache
-        # We must check that the job_info holds the necessary fields
         if not all(
             [
                 job_info.job_id,  # Required always
@@ -35,16 +60,13 @@ def update_job_info_cache(job_id: str, job_info: CategorizerJobInfo):
             raise ValueError("Job info must contain all required fields.")
         job_info_cache[job_id] = job_info
     else:
-        # If it exists, we update the existing job info
         existing_job_info = job_info_cache[job_id]
         existing_job_info.status = job_info.status
-        # Ignore total_messages -- it is given on startup.
+        # Update processed messages if applicable
         if job_info.processed_messages is not None:
-            assert (
-                existing_job_info.processed_messages is not None
-            ), "Total messages should be initialized as an int"
+            if existing_job_info.processed_messages is None:
+                raise ValueError("Processed messages should be initialized as an int")
             existing_job_info.processed_messages += job_info.processed_messages
-            # TODO : determine an else clause ?
         existing_job_info.eta = job_info.eta
         if job_info.last_update is not None:
             existing_job_info.last_update = job_info.last_update
@@ -59,12 +81,33 @@ async def read_root():
     return {"message": "Welcome to your FastAPI app!"}
 
 
-@app.post("/launch_job")
-async def launch_job():
-    pass  # TODO : implement the job launching logic (give an ID, start the task, etc.)
-    # # Start background thread
-    # job_id = start_job_thread()
-    # return {"message": "Job started", "job_id": job_id}
+@app.post("/update_db")
+async def launch_update_db():
+    """
+    Endpoint to trigger the database update.
+    This will run the ChromaUpserter to add any missing conversations
+    to the chroma database.
+    """
+    # Update the shared state via app.state
+    app.state.cache.update_db_cache = JobStatus.RUNNING
+    try:
+        result = update_db()
+        app.state.cache.update_db_cache = JobStatus.COMPLETED
+        return result
+    except Exception as e:
+        app.state.cache.update_db_cache = JobStatus.FAILED
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/update_db_status")
+async def get_update_db_status():
+    """
+    Endpoint to get the current status of the database update.
+    """
+    status = app.state.cache.update_db_cache
+    if status == JobStatus.IDLE:
+        return {"status": "No update in progress"}
+    return {"status": status.value}
 
 
 @app.post("/update_jobinfo")
@@ -75,9 +118,10 @@ async def update_jobinfo(update: CategorizerJobInfo):
 
 @app.get("/job_update/{job_id}")
 async def job_update(job_id: str):
-    if job_id not in job_info_cache:
+    cache = app.state.job_info_cache
+    if job_id not in cache:
         raise HTTPException(status_code=404, detail="Job not found")
-    return job_info_cache[job_id]
+    return cache[job_id]
 
 
 if __name__ == "__main__":
