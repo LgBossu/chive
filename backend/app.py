@@ -52,7 +52,6 @@ def update_job_info_cache(job_id: str, job_info: CategorizerJobInfo):
             existing_job_info.current_message_id = job_info.current_message_id
         if job_info.current_speed is not None:
             existing_job_info.current_speed = job_info.current_speed
-        # Update the cache with the modified job info
 
 
 @app.get("/")
