@@ -1,8 +1,10 @@
+import os
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Dict
 
 from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
 
 from backend.app_actions import update_db
 
@@ -37,6 +39,10 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+# Mount static files from the frontend folder under /static
+frontend_path = os.path.join(os.path.dirname(__file__), "..", "frontend")
+app.mount("/static", StaticFiles(directory=frontend_path, html=True), name="static")
 
 
 def update_job_info_cache(job_id: str, job_info: CategorizerJobInfo):
