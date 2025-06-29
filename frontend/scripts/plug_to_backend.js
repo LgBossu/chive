@@ -1,6 +1,6 @@
 // plug_to_backend.js
 
-const API_URL = 'http://localhost:3000/api/endpoint'; // Change to your actual endpoint
+const API_URL = 'http://localhost:8000/'; // Change to your actual endpoint
 const POLL_INTERVAL_MS = 2000; // 5 seconds
 
 async function postDatabaseUpdate() {
