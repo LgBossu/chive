@@ -85,7 +85,7 @@ def update_job_info_cache(job_id: str, job_info: CategorizerJobInfo):
 
 @app.get("/favicon.ico")
 async def favicon():
-    return FileResponse("icon/placeholder.ico")
+    return FileResponse("frontend/assets/icons/applogo.ico")
 
 
 @app.get("/")
