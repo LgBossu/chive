@@ -4,7 +4,7 @@
     background-color: var(--highlight);
     border-radius: 0.5rem;
     box-shadow: 0 0 5px 2px rgba(0, 0, 0, 0.2);
-    margin: 1rem auto;
+    margin: auto;
     max-width: 800px;
 }
 
