@@ -2,9 +2,9 @@
 
 /* Base colors for dark mode */
 :root {
-    --bg: #1e1e1e;
-    --panel: #2c2c2c;
-    --highlight: #3a3a3a;
+    --bg: #171717;
+    --panel: #222222;
+    --highlight: #323232;
     --text: #f1f1f1;
     --user: #c88e31;
     --assistant: #b15050;
