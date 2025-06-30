@@ -83,14 +83,14 @@ def update_job_info_cache(job_id: str, job_info: CategorizerJobInfo):
             existing_job_info.current_speed = job_info.current_speed
 
 
-@app.get("/favicon.ico")
-async def favicon():
-    return FileResponse("frontend/assets/icons/applogo.ico")
-
-
 @app.get("/")
 async def read_root():
     return {"message": "Welcome to your FastAPI app!"}
+
+
+@app.get("/favicon.ico")
+async def favicon():
+    return FileResponse("frontend/assets/icons/applogo.ico")
 
 
 @app.post("/update_db")
