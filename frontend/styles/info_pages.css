@@ -1,10 +1,9 @@
 /* Container for standalone info pages */
 .info-container {
     padding: 1.5rem;
-    background-color: var(--panel);
-    /* Inherits the global panel background */
+    background-color: var(--highlight);
     border-radius: 0.5rem;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 0 5px 2px rgba(0, 0, 0, 0.2);
     margin: 1rem auto;
     max-width: 800px;
 }
@@ -49,7 +48,7 @@
 }
 
 .api-action-button:hover {
-    background-color: #267acc;
+    background-color: var(--accent-hover);
     /* manually defined hover color */
 }
 

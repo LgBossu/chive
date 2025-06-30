@@ -9,6 +9,7 @@
     --user: #c88e31;
     --assistant: #b15050;
     --accent: #6bb7ff;
+    --accent-hover: #267acc;
 }
 
 /* If the user has dark mode enabled, keep this. If not, fall back to light (optional) */
@@ -21,6 +22,7 @@
         --user: #ffd591;
         --assistant: #ffabab;
         --accent: #3399ff;
+        --accent-hover: #1d69b4;
     }
 }
 
@@ -211,7 +213,7 @@ body {
 
 #search-database button:hover,
 #edit-metadata button:hover {
-    background-color: var(--accent);
+    background-color: var(--accent-hover);
 }
 
 textarea {
