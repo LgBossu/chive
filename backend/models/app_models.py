@@ -1,7 +1,7 @@
 """To write and store models used by and for the fastapi's various endpoints."""
 
 from enum import Enum
-from typing import Optional, List
+from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -15,7 +15,6 @@ class JobStatus(str, Enum):
 
 
 class CategorizerJobInfo(BaseModel):
-    job_id: str
     status: JobStatus
     total_messages: Optional[int] = None
     processed_messages: Optional[int] = None
