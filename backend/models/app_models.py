@@ -6,6 +6,12 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 
+class PlainResponse(BaseModel):
+    """A simple response model for endpoints that return a message."""
+
+    message: str
+
+
 class JobStatus(str, Enum):
     RUNNING = "running"
     IDLE = "idle"

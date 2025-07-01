@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.app_actions import categorize, update_db
-from backend.models.app_models import CategorizerJobInfo, JobStatus, UpdaterJobInfo
+from backend.models.app_models import CategorizerJobInfo, JobStatus, PlainResponse, UpdaterJobInfo
 
 
 @dataclass
@@ -28,14 +28,13 @@ async def lifespan(app: FastAPI):
     This is called when the application starts and stops.
     """
     # Initialize the standard cached info
+    categorizer_cache = CategorizerJobInfo(status=JobStatus.IDLE)
+    update_db_cache = UpdaterJobInfo(status=JobStatus.IDLE, updated_conversations=list())
+
+    # Store the caches in the app state
     app.state.cache = Cache(
-        categorizer_cache=CategorizerJobInfo(
-            status=JobStatus.IDLE,
-        ),
-        update_db_cache=UpdaterJobInfo(
-            status=JobStatus.IDLE,
-            updated_conversations=list(),
-        ),
+        categorizer_cache=categorizer_cache,
+        update_db_cache=update_db_cache,
     )
     yield
     # Cleanup can be done here if needed
@@ -48,17 +47,17 @@ frontend_path = os.path.join(os.path.dirname(__file__), "..", "frontend")
 app.mount("/static", StaticFiles(directory=frontend_path, html=True), name="static")
 
 
-@app.get("/", response_model=dict)
+@app.get("/", response_model=PlainResponse)
 async def read_root():
-    return {"message": "Welcome to your FastAPI app!"}
+    return PlainResponse(message="Welcome to the ChatGPT Post Processing API!")
 
 
-@app.get("/favicon.ico")
+@app.get("/favicon.ico", response_class=FileResponse)
 async def favicon():
     return FileResponse("frontend/assets/icons/applogo.ico")
 
 
-@app.post("/update_db/run", response_model=dict)
+@app.post("/update_db/run", response_model=PlainResponse)
 async def update_db_run():
     """
     Endpoint to trigger the database update.
@@ -79,15 +78,15 @@ async def update_db_run():
     # Update the shared state via app.state
     cache.status = JobStatus.RUNNING
     try:
-        result = update_db()
+        update_db()
         cache.status = JobStatus.COMPLETED
-        return result
+        return PlainResponse(message="Database updated successfully.")
     except Exception as e:
         cache.status = JobStatus.FAILED
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/update_db/update", response_model=dict)
+@app.post("/update_db/update", response_model=PlainResponse)
 async def update_db_update(update: UpdaterJobInfo):
     """
     Endpoint to update the status of the database update job.
@@ -99,7 +98,7 @@ async def update_db_update(update: UpdaterJobInfo):
     # Update the shared state via app.state
     cache.status = update.status
     cache.updated_conversations.extend(update.updated_conversations)
-    return {"message": "Update status updated"}
+    return PlainResponse(message="success")
 
 
 @app.get("/update_db/status", response_model=UpdaterJobInfo)
@@ -111,7 +110,7 @@ async def update_db_status():
     return cache
 
 
-@app.post("/categorizer/run", response_model=dict)
+@app.post("/categorizer/run", response_model=PlainResponse)
 async def categorizer_start():
     """
     Endpoint to start a categorizer job.
@@ -126,15 +125,15 @@ async def categorizer_start():
     # Update the shared state via app.state
     cache.status = JobStatus.RUNNING
     try:
-        result = categorize()
+        categorize()
         cache.status = JobStatus.COMPLETED
-        return result
+        return PlainResponse(message="Categorization run successfully.")
     except Exception as e:
         cache.status = JobStatus.FAILED
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/categorizer/update", response_model=dict)
+@app.post("/categorizer/update", response_model=PlainResponse)
 async def categorizer_update(update: CategorizerJobInfo):
     """
     Endpoint to update the status of the categorizer job.
@@ -169,7 +168,7 @@ async def categorizer_update(update: CategorizerJobInfo):
     if update.current_speed is not None:
         cache.current_speed = update.current_speed
 
-    return {"message": "Job info updated"}
+    return PlainResponse(message="success")
 
 
 @app.get("/categorizer/status", response_model=CategorizerJobInfo)

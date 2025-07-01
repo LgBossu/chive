@@ -1,10 +1,8 @@
-from typing import Dict
-
 # from backend.processing.categorizer import CategorizerEngine
 from backend.loaders.chroma_endpoints import ChromaUpserter
 
 
-def update_db() -> Dict[str, str]:
+def update_db():
     """
     Update the database contents.
 
@@ -16,10 +14,10 @@ def update_db() -> Dict[str, str]:
     chroma_upserter = ChromaUpserter(api_endpoint="http://localhost:8000/update_db_update")
     chroma_upserter.upsert_all_conversations()
 
-    return {"message": "Database updated successfully."}
+    return None
 
 
-def categorize() -> Dict[str, str]:
+def categorize():
     """
     Categorize messages in the database.
 
@@ -30,4 +28,4 @@ def categorize() -> Dict[str, str]:
         "This endpoint is not implemented yet. Use /categorizer_update to update job info."
     )
 
-    return {"message": "Categorized successfully."}
+    return None
