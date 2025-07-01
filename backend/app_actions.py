@@ -17,3 +17,17 @@ def update_db() -> Dict[str, str]:
     chroma_upserter.upsert_all_conversations()
 
     return {"message": "Database updated successfully."}
+
+
+def categorize() -> Dict[str, str]:
+    """
+    Categorize messages in the database.
+
+    Runs the CategorizerEngine to categorize messages
+    and update their status in the database.
+    """
+    raise NotImplementedError(
+        "This endpoint is not implemented yet. Use /categorizer_update to update job info."
+    )
+
+    return {"message": "Categorized successfully."}

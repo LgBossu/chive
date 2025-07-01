@@ -1,7 +1,7 @@
 """To write and store models used by and for the fastapi's various endpoints."""
 
 from enum import Enum
-from typing import Optional
+from typing import Optional, List
 
 from pydantic import BaseModel
 
@@ -24,3 +24,8 @@ class CategorizerJobInfo(BaseModel):
     # datetime is not json serializable, so we use a float UNIX timestamp
     current_message_id: Optional[str] = None
     current_speed: Optional[float] = None  # messages per second
+
+
+class UpdaterJobInfo(BaseModel):
+    status: JobStatus
+    updated_conversations: List[str] = []

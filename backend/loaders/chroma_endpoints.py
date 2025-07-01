@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Mapping, NamedTuple, Optional, Set, Tuple, Union
+import requests
 
 import chromadb
 import chromadb.api
@@ -14,6 +15,7 @@ from backend.loaders.conversation_loader import ConversationLoader
 from backend.loaders.conversation_parser import ConversationParser, ParsedMessage
 from backend.utils import hash_utils as hash_utils
 from backend.utils.path_utils import get_paths
+from backend.models.app_models import JobStatus, UpdaterJobInfo
 
 Metadata = Mapping[
     str, Union[str, int, float, bool]
@@ -259,7 +261,9 @@ class ChromaUpserter:
     # TODO : find a way for the script to flag or skip conversations
     # that are already in the database in entirety
 
-    def __init__(self, client: Optional[chromadb.api.ClientAPI] = None) -> None:
+    def __init__(
+        self, client: Optional[chromadb.api.ClientAPI] = None, api_endpoint: Optional[str] = None
+    ) -> None:
         """
         Initialize the ChromaUpserter with the ChromaDB client and collections.
 
@@ -279,6 +283,8 @@ class ChromaUpserter:
 
         self.conv_collection = self.client.get_collection(self.conv_collection_name)
         self.mess_collection = self.client.get_collection(self.mess_collection_name)
+
+        self.api_endpoint = api_endpoint
 
         self.conversation_loader = ConversationLoader()
 
@@ -302,6 +308,29 @@ class ChromaUpserter:
         )
 
         logger.success(f"Conversation '{upsertable_conv.title.title}' upserted successfully.")
+
+        if self.api_endpoint is not None:
+            # If an API endpoint is provided, send a POST request to update the job status
+            try:
+                response = requests.post(
+                    self.api_endpoint,
+                    json={
+                        "status": JobStatus.RUNNING.value,
+                        "updated_conversations": [upsertable_conv.title.title],
+                    },
+                )
+                response.raise_for_status()  # Raise an error for bad responses
+
+                logger.debug(
+                    f"Successfully updated job status for conversation '{upsertable_conv.title.title}' at {self.api_endpoint}."  # noqa: E501
+                )
+            except requests.RequestException as e:
+                logger.error(
+                    f"Failed to update job status for conversation '{upsertable_conv.title.title}' at {self.api_endpoint}: {e}"  # noqa: E501
+                )
+                raise requests.RequestException(
+                    f"Failed to update job status for conversation '{upsertable_conv.title.title}' at {self.api_endpoint}: {e}"  # noqa: E501
+                ) from e
 
     def upsert_all_conversations(self) -> None:
         """

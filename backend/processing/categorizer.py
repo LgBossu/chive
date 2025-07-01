@@ -74,9 +74,7 @@ class CategorizerEngine:
             """
             # TODO : refactor the code below to use the API after every finished message.
             # This will allow to update the job status and progress in real-time,
-            url: str = (
-                "http://localhost:8000/update_jobinfo"  # TODO : do not hardcode the actual job URL
-            )
+            url: str = "http://localhost:8000/categorizer_update"  # TODO : do not hardcode the actual job URL
             if last_update is None:
                 last_update = time()
             job_info = CategorizerJobInfo(
