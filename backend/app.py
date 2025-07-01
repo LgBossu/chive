@@ -112,8 +112,10 @@ async def update_db_status():
 
 @app.post("/categorizer_start")
 async def categorizer_start():
-    """Endpoint to start a categorizer job.
-    This will initialize the job info in the cache, start the job, and return the job ID."""
+    """
+    Endpoint to start a categorizer job.
+    This will initialize the job info in the cache, start the job, and return the job ID.
+    """
     cache: CategorizerJobInfo = app.state.cache.job_info_cache
     # Update the shared state via app.state
     cache.status = JobStatus.RUNNING
