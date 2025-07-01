@@ -164,8 +164,8 @@ async def categorizer_update(update: CategorizerJobInfo):
     return {"message": "Job info updated"}
 
 
-@app.get("/categorizer_status/{job_id}")
-async def categorizer_status(job_id: str):
+@app.get("/categorizer_status")
+async def categorizer_status():
     cache: CategorizerJobInfo = app.state.cache.categorizer_cache
     return cache.model_dump_json()
 
