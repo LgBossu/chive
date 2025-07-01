@@ -60,7 +60,7 @@ async def favicon():
     return FileResponse("frontend/assets/icons/applogo.ico")
 
 
-@app.post("/update_db_run")
+@app.post("/update_db/run")
 async def update_db_run():
     """
     Endpoint to trigger the database update.
@@ -73,6 +73,11 @@ async def update_db_run():
     (in current version, it always updates all the conversations).
     """
     cache: UpdaterJobInfo = app.state.cache.update_db_cache
+
+    # Check if an update is already in progress
+    if cache.status == JobStatus.RUNNING:
+        raise HTTPException(status_code=400, detail="Update already in progress")
+
     # Update the shared state via app.state
     cache.status = JobStatus.RUNNING
     try:
@@ -84,7 +89,7 @@ async def update_db_run():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/update_db_update")
+@app.post("/update_db/update")
 async def update_db_update(update: UpdaterJobInfo):
     """
     Endpoint to update the status of the database update job.
@@ -99,7 +104,7 @@ async def update_db_update(update: UpdaterJobInfo):
     return {"message": "Update status updated"}
 
 
-@app.get("/update_db_status")
+@app.get("/update_db/status")
 async def update_db_status():
     """
     Endpoint to get the current status of the database update.
@@ -108,13 +113,18 @@ async def update_db_status():
     return cache.model_dump_json()
 
 
-@app.post("/categorizer_run")
+@app.post("/categorizer/run")
 async def categorizer_start():
     """
     Endpoint to start a categorizer job.
     This will initialize the job info in the cache, start the job, and return the job ID.
     """
     cache: CategorizerJobInfo = app.state.cache.job_info_cache
+
+    # Check if a categorizer job is already running
+    if cache.status == JobStatus.RUNNING:
+        raise HTTPException(status_code=400, detail="Categorizer job already in progress")
+
     # Update the shared state via app.state
     cache.status = JobStatus.RUNNING
     try:
@@ -126,7 +136,7 @@ async def categorizer_start():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/categorizer_update")
+@app.post("/categorizer/update")
 async def categorizer_update(update: CategorizerJobInfo):
     """
     Endpoint to update the status of the categorizer job.
@@ -164,7 +174,7 @@ async def categorizer_update(update: CategorizerJobInfo):
     return {"message": "Job info updated"}
 
 
-@app.get("/categorizer_status")
+@app.get("/categorizer/status")
 async def categorizer_status():
     cache: CategorizerJobInfo = app.state.cache.categorizer_cache
     return cache.model_dump_json()
