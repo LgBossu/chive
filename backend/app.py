@@ -7,8 +7,6 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.app_actions import categorize, update_db
-
-# from pydantic import BaseModel, Field
 from backend.models.app_models import CategorizerJobInfo, JobStatus, UpdaterJobInfo
 
 
@@ -32,12 +30,12 @@ async def lifespan(app: FastAPI):
     # Initialize the standard cached info
     app.state.cache = Cache(
         categorizer_cache=CategorizerJobInfo(
-            status=JobStatus.IDLE,  # Initialize the job status
+            status=JobStatus.IDLE,
         ),
         update_db_cache=UpdaterJobInfo(
-            status=JobStatus.IDLE,  # Initialize the update status
-            updated_conversations=list(),  # Initialize the list of updated conversations
-        ),  # Initialize the update status
+            status=JobStatus.IDLE,
+            updated_conversations=list(),
+        ),
     )
     yield
     # Cleanup can be done here if needed
@@ -50,7 +48,7 @@ frontend_path = os.path.join(os.path.dirname(__file__), "..", "frontend")
 app.mount("/static", StaticFiles(directory=frontend_path, html=True), name="static")
 
 
-@app.get("/")
+@app.get("/", response_model=dict)
 async def read_root():
     return {"message": "Welcome to your FastAPI app!"}
 
@@ -60,7 +58,7 @@ async def favicon():
     return FileResponse("frontend/assets/icons/applogo.ico")
 
 
-@app.post("/update_db/run")
+@app.post("/update_db/run", response_model=dict)
 async def update_db_run():
     """
     Endpoint to trigger the database update.
@@ -85,11 +83,11 @@ async def update_db_run():
         cache.status = JobStatus.COMPLETED
         return result
     except Exception as e:
-        app.state.cache.update_db_cache = JobStatus.FAILED
+        cache.status = JobStatus.FAILED
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/update_db/update")
+@app.post("/update_db/update", response_model=dict)
 async def update_db_update(update: UpdaterJobInfo):
     """
     Endpoint to update the status of the database update job.
@@ -104,16 +102,16 @@ async def update_db_update(update: UpdaterJobInfo):
     return {"message": "Update status updated"}
 
 
-@app.get("/update_db/status")
+@app.get("/update_db/status", response_model=UpdaterJobInfo)
 async def update_db_status():
     """
     Endpoint to get the current status of the database update.
     """
     cache: UpdaterJobInfo = app.state.cache.update_db_cache
-    return cache.model_dump_json()
+    return cache
 
 
-@app.post("/categorizer/run")
+@app.post("/categorizer/run", response_model=dict)
 async def categorizer_start():
     """
     Endpoint to start a categorizer job.
@@ -136,7 +134,7 @@ async def categorizer_start():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/categorizer/update")
+@app.post("/categorizer/update", response_model=dict)
 async def categorizer_update(update: CategorizerJobInfo):
     """
     Endpoint to update the status of the categorizer job.
@@ -174,10 +172,10 @@ async def categorizer_update(update: CategorizerJobInfo):
     return {"message": "Job info updated"}
 
 
-@app.get("/categorizer/status")
+@app.get("/categorizer/status", response_model=CategorizerJobInfo)
 async def categorizer_status():
     cache: CategorizerJobInfo = app.state.cache.categorizer_cache
-    return cache.model_dump_json()
+    return cache
 
 
 if __name__ == "__main__":
