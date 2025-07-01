@@ -95,7 +95,7 @@ async def update_db_update(update: UpdaterJobInfo):
         raise HTTPException(status_code=400, detail="No update in progress")
     # Update the shared state via app.state
     cache.status = update.status
-    cache.updated_conversations = update.updated_conversations
+    cache.updated_conversations.extend(update.updated_conversations)
     return {"message": "Update status updated"}
 
 
@@ -104,13 +104,11 @@ async def update_db_status():
     """
     Endpoint to get the current status of the database update.
     """
-    status = app.state.cache.update_db_cache
-    if status == JobStatus.IDLE:
-        return {"status": "No update in progress"}
-    return {"status": status.value}
+    cache: UpdaterJobInfo = app.state.cache.update_db_cache
+    return cache.model_dump_json()
 
 
-@app.post("/categorizer_start")
+@app.post("/categorizer_run")
 async def categorizer_start():
     """
     Endpoint to start a categorizer job.
@@ -142,7 +140,10 @@ async def categorizer_update(update: CategorizerJobInfo):
     cache.status = update.status
     # Total messages
     if update.total_messages is not None:
-        cache.total_messages = update.total_messages
+        cache.total_messages = max(
+            update.total_messages,
+            cache.total_messages if cache.total_messages is not None else 0,
+        )  # We retain the maximum total messages logged so far
     # Processed messages
     if cache.processed_messages is None:
         cache.processed_messages = 0
@@ -165,10 +166,8 @@ async def categorizer_update(update: CategorizerJobInfo):
 
 @app.get("/categorizer_status/{job_id}")
 async def categorizer_status(job_id: str):
-    cache = app.state.cache.job_info_cache
-    if job_id not in cache:
-        raise HTTPException(status_code=404, detail="Job not found")
-    return cache[job_id].json()
+    cache: CategorizerJobInfo = app.state.cache.categorizer_cache
+    return cache.model_dump_json()
 
 
 if __name__ == "__main__":

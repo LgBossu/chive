@@ -13,7 +13,7 @@ def update_db() -> Dict[str, str]:
     """
 
     # Upsert the categorized data into the database
-    chroma_upserter = ChromaUpserter()
+    chroma_upserter = ChromaUpserter(api_endpoint="http://localhost:8000/update_db_update")
     chroma_upserter.upsert_all_conversations()
 
     return {"message": "Database updated successfully."}

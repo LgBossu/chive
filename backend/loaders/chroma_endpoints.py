@@ -3,19 +3,19 @@
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Mapping, NamedTuple, Optional, Set, Tuple, Union
-import requests
 
 import chromadb
 import chromadb.api
 import chromadb.api.types
 import numpy as np
+import requests
 from loguru import logger
 
 from backend.loaders.conversation_loader import ConversationLoader
 from backend.loaders.conversation_parser import ConversationParser, ParsedMessage
+from backend.models.app_models import JobStatus, UpdaterJobInfo
 from backend.utils import hash_utils as hash_utils
 from backend.utils.path_utils import get_paths
-from backend.models.app_models import JobStatus, UpdaterJobInfo
 
 Metadata = Mapping[
     str, Union[str, int, float, bool]
@@ -311,13 +311,14 @@ class ChromaUpserter:
 
         if self.api_endpoint is not None:
             # If an API endpoint is provided, send a POST request to update the job status
+            updater = UpdaterJobInfo(
+                status=JobStatus.RUNNING,
+                updated_conversations=[upsertable_conv.title.title],
+            )
             try:
                 response = requests.post(
                     self.api_endpoint,
-                    json={
-                        "status": JobStatus.RUNNING.value,
-                        "updated_conversations": [upsertable_conv.title.title],
-                    },
+                    json=updater.model_dump(),
                 )
                 response.raise_for_status()  # Raise an error for bad responses
 

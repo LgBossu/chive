@@ -22,6 +22,8 @@ from backend.utils.log_setup import LoggerSetup
 # TODO : maybe shard the databases and categorization process
 # to avoid memory issues when and if the project scales up.
 
+# TODO : factorize this module to separate logic and utils from runtime.
+
 NO_STALLING_ID = "[NotAnId]"
 
 
@@ -39,11 +41,11 @@ def display_time(seconds: float, tz: int = 1, duration: bool = False) -> str:
 class CategorizerEngine:
     @staticmethod
     def categorization_loop(
-        job_id: str,
         LOG_FILE: Path,
         logger_setup: LoggerSetup,
         categorizer_model_type: type[CategorizerModel],  # Lets the user specify
         # the categorizer model to use. We can try different models and implementations.
+        api_endpoint: Optional[str] = None,
     ):
         # Set up the logger for the subprocess
         logger_setup.configure_logger(
@@ -60,6 +62,7 @@ class CategorizerEngine:
         from backend.models.app_models import CategorizerJobInfo, JobStatus
 
         def post_status_after_message(
+            api_endpoint: str,
             eta: Optional[str] = None,
             current_message_id: Optional[str] = None,
             current_speed: Optional[float] = None,
@@ -71,14 +74,14 @@ class CategorizerEngine:
             This is used to update the job status and progress in the metafile.
 
             A priori, this function is called after every processed message, no more, no less.
+
+            It declares runtime info, and the successor message's ID (so the current message ID).
             """
             # TODO : refactor the code below to use the API after every finished message.
             # This will allow to update the job status and progress in real-time,
-            url: str = "http://localhost:8000/categorizer_update"  # TODO : do not hardcode the actual job URL
             if last_update is None:
                 last_update = time()
             job_info = CategorizerJobInfo(
-                job_id=job_id,
                 status=JobStatus.RUNNING,
                 total_messages=None,  # This was set at the beginning of the job
                 processed_messages=processed_messages,
@@ -88,7 +91,7 @@ class CategorizerEngine:
                 current_speed=current_speed,
             )
             try:
-                post(url, json=job_info.model_dump())
+                post(api_endpoint, json=job_info.model_dump())
             except HTTPError as e:
                 logger.error(f"Failed to post job progress: {e}")
             except ConnectionError as e:
@@ -167,24 +170,34 @@ class CategorizerEngine:
             message_start_time = time()
             total_processed += 1
 
-            if first_message:
-                post_status_after_message(
-                    processed_messages=0,  # No messages processed yet
+            if api_endpoint is None:
+                logger.warning(
+                    "No API endpoint provided for job status updates. "
+                    "Job progress will not be posted."
                 )
-                first_message = False
             else:
-                average_processing_time = (
-                    sum(processing_times) / len(processing_times) if processing_times else 0
-                )
-                post_status_after_message(
-                    current_message_id=message_id,
-                    current_speed=average_processing_time,  # Average processing time  # noqa: E501
-                    last_update=message_start_time,
-                    eta=display_time(
-                        average_processing_time * (len(nonempty_uncategorized) - total_processed),
-                        duration=True,
-                    ),
-                )
+                if first_message:
+                    post_status_after_message(
+                        api_endpoint=api_endpoint,
+                        processed_messages=0,  # No messages processed yet
+                    )
+                    first_message = False
+                else:
+                    average_processing_time = (
+                        sum(processing_times) / len(processing_times) if processing_times else 0
+                    )
+                    post_status_after_message(
+                        api_endpoint=api_endpoint,
+                        current_message_id=message_id,
+                        current_speed=average_processing_time,  # Average processing time  # noqa: E501
+                        last_update=message_start_time,
+                        eta=display_time(
+                            average_processing_time
+                            * (len(nonempty_uncategorized) - total_processed),
+                            duration=True,
+                        ),
+                    )
+
             if message_id in already_tagged_messages:
                 logger.trace(f"Message {message_id} already seen, skipping.")
                 continue
@@ -198,7 +211,7 @@ class CategorizerEngine:
                     safety_input_length=2048,
                 )  # Do NOT FORGET TO SET THE MAXIMUM OUTPUT LENGTH
                 # This omission can lead to excessive processing times and memory usage.
-                # With 5 beams full search, this can be VERY, VERY expensive real fast.
+                # With 5 beams full search, this can be VERY, VERY expensive, real fast.
                 logger.debug(f"Categories for message {message_id}: {categories}")
             except categorizer_model.ExceedingSafetyLimitError as e:
                 categories = [BLACKLIST_TAG]
@@ -264,7 +277,7 @@ class CategorizerEngine:
 
     def __init__(
         self,
-        job_id: str,
+        api_endpoint: str,
         override_categorizer_model: Optional[type[CategorizerModel]] = None,
         stalling_timeout: int = 30,
         non_faulty_stalls_max: int = 4,
@@ -273,8 +286,8 @@ class CategorizerEngine:
         Initializes the categorizer engine.
         This is a wrapper for the categorization loop.
         """
-        # Set the job ID
-        self.job_id = job_id
+        # Set the API endpoint for job status updates
+        self.api_endpoint = api_endpoint
 
         # Set up the logger
         self.ongoing_log_file = LoggerSetup.configure_logger()
@@ -334,26 +347,20 @@ class CategorizerEngine:
     def post_progress(
         self,
         total_messages: int,
-        processed_messages: int = 0,
-        eta: Optional[str] = None,
     ) -> None:
         """
         Posts the progress of the categorization job to the appropriate API endpoint.
         This is used to update the job status and progress in the metafile.
         """
         job_info = CategorizerJobInfo(
-            job_id=self.job_id,
             status=JobStatus.RUNNING,
-            total_messages=total_messages,  # This will be set later
-            processed_messages=processed_messages,  # This will be set later
-            eta=eta,  # This will be set later
+            total_messages=total_messages,  # Log the total number of messages to categorize
             last_update=time(),
-            current_message_id=None,  # This will be set later
-            current_speed=None,  # This will be set later
+            current_message_id=None,  # We are not currently processing any message
         )
         try:
             post(
-                "http://localhost:8000/update_jobinfo",  # TODO : do not hardcode the actual job URL
+                self.api_endpoint,  # TODO : do not hardcode the actual job URL
                 json=job_info.model_dump(),
             )
         except HTTPError as e:
@@ -427,6 +434,7 @@ class CategorizerEngine:
                 self.ongoing_log_file,
                 LoggerSetup,
                 self.categorizer_model_type,
+                self.api_endpoint,  # Pass the API endpoint for job status updates
             ),
         )
         categorization_process.start()
@@ -511,5 +519,5 @@ if __name__ == "__main__":
 
     # RUN AUTOMATIC CATEGORIZER PIPELINE
     logger.info("Running automatic categorizer pipeline...")
-    categorizer_engine = CategorizerEngine(job_id="DEBUG")
+    categorizer_engine = CategorizerEngine(api_endpoint="http://localhost:8000/categorizer_update")
     categorizer_engine.run_categorization()
