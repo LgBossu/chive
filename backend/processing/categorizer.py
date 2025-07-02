@@ -519,5 +519,5 @@ if __name__ == "__main__":
 
     # RUN AUTOMATIC CATEGORIZER PIPELINE
     logger.info("Running automatic categorizer pipeline...")
-    categorizer_engine = CategorizerEngine(api_endpoint="http://localhost:8000/categorizer_update")
+    categorizer_engine = CategorizerEngine(api_endpoint="http://127.0.0.1:8000/categorizer_update")
     categorizer_engine.run_categorization()
