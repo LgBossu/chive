@@ -1,13 +1,20 @@
 import os
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from multiprocessing import Process
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from loguru import logger
 
 from backend.app_actions import categorize, update_db
 from backend.models.app_models import CategorizerJobInfo, JobStatus, PlainResponse, UpdaterJobInfo
+from backend.utils.log_setup import LoggerSetup
+
+# Set up logging
+logger_setup = LoggerSetup()
+LOG_PATH = logger_setup.configure_logger()
 
 
 @dataclass
@@ -49,6 +56,7 @@ app.mount("/static", StaticFiles(directory=frontend_path, html=True), name="stat
 
 @app.get("/", response_model=PlainResponse)
 async def read_root():
+    logger.trace("Root endpoint accessed.")
     return PlainResponse(message="Welcome to the ChatGPT Post Processing API!")
 
 
@@ -69,21 +77,20 @@ async def update_db_run():
     No ID is returned, as this is a single job that is expected to run only once
     (in current version, it always updates all the conversations).
     """
+    logger.trace("Starting database update job.")
     cache: UpdaterJobInfo = app.state.cache.update_db_cache
 
     # Check if an update is already in progress
     if cache.status == JobStatus.RUNNING:
         raise HTTPException(status_code=400, detail="Update already in progress")
 
-    # Update the shared state via app.state
+    # Reset the cache fields before starting a new update
     cache.status = JobStatus.RUNNING
-    try:
-        update_db()
-        cache.status = JobStatus.COMPLETED
-        return PlainResponse(message="Database updated successfully.")
-    except Exception as e:
-        cache.status = JobStatus.FAILED
-        raise HTTPException(status_code=500, detail=str(e))
+    cache.updated_conversations = []
+
+    p = Process(target=update_db, args=(LOG_PATH,))  # Pass the log path to the update_db function
+    p.start()
+    return PlainResponse(message="Database update started.")
 
 
 @app.post("/update_db/update", response_model=PlainResponse)
@@ -92,12 +99,18 @@ async def update_db_update(update: UpdaterJobInfo):
     Endpoint to update the status of the database update job.
     This is used to update the in-memory cache with the latest job info.
     """
+    logger.trace("Updating database job status with new information.")
+
     cache: UpdaterJobInfo = app.state.cache.update_db_cache
     if cache.status == JobStatus.IDLE:
         raise HTTPException(status_code=400, detail="No update in progress")
     # Update the shared state via app.state
     cache.status = update.status
-    cache.updated_conversations.extend(update.updated_conversations)
+
+    for conversation in update.updated_conversations:
+        if conversation not in cache.updated_conversations:
+            cache.updated_conversations.append(conversation)
+
     return PlainResponse(message="success")
 
 
@@ -106,6 +119,7 @@ async def update_db_status():
     """
     Endpoint to get the current status of the database update.
     """
+    logger.trace("Fetching database update job status.")
     cache: UpdaterJobInfo = app.state.cache.update_db_cache
     return cache
 
@@ -116,7 +130,9 @@ async def categorizer_start():
     Endpoint to start a categorizer job.
     This will initialize the job info in the cache, start the job, and return the job ID.
     """
-    cache: CategorizerJobInfo = app.state.cache.job_info_cache
+    logger.trace("Starting categorizer job.")
+
+    cache: CategorizerJobInfo = app.state.cache.categorizer_cache
 
     # Check if a categorizer job is already running
     if cache.status == JobStatus.RUNNING:
@@ -124,13 +140,10 @@ async def categorizer_start():
 
     # Update the shared state via app.state
     cache.status = JobStatus.RUNNING
-    try:
-        categorize()
-        cache.status = JobStatus.COMPLETED
-        return PlainResponse(message="Categorization run successfully.")
-    except Exception as e:
-        cache.status = JobStatus.FAILED
-        raise HTTPException(status_code=500, detail=str(e))
+
+    p = Process(target=categorize, args=(LOG_PATH,))  # Pass the log path to the categorize function
+    p.start()
+    return PlainResponse(message="Categorizer job started.")
 
 
 @app.post("/categorizer/update", response_model=PlainResponse)
@@ -139,6 +152,8 @@ async def categorizer_update(update: CategorizerJobInfo):
     Endpoint to update the status of the categorizer job.
     This is used to update the in-memory cache with the latest job info.
     """
+    logger.trace("Updating categorizer job status with new information.")
+
     cache: CategorizerJobInfo = app.state.cache.categorizer_cache
 
     ### Update fields if applicable ###
@@ -173,6 +188,8 @@ async def categorizer_update(update: CategorizerJobInfo):
 
 @app.get("/categorizer/status", response_model=CategorizerJobInfo)
 async def categorizer_status():
+    logger.trace("Fetching categorizer job status.")
+
     cache: CategorizerJobInfo = app.state.cache.categorizer_cache
     return cache
 
