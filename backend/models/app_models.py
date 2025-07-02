@@ -13,11 +13,11 @@ class PlainResponse(BaseModel):
 
 
 class JobStatus(str, Enum):
-    RUNNING = "running"
-    IDLE = "idle"
-    STALLED = "stalled"
-    COMPLETED = "completed"
-    FAILED = "failed"
+    RUNNING = "Running"
+    IDLE = "Idle"
+    STALLED = "Stalled"
+    COMPLETED = "Completed"
+    FAILED = "Failed"
 
 
 class CategorizerJobInfo(BaseModel):
