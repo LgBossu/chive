@@ -5,7 +5,9 @@
     border-radius: 0.5rem;
     box-shadow: 0 0 5px 2px rgba(0, 0, 0, 0.2);
     margin: auto;
-    max-width: 800px;
+    min-width: 300px;
+    /* max-width: 800px; */
+    width: 30%;
 }
 
 /* Header styling specific to info pages */
@@ -25,6 +27,30 @@
     border-left: 4px solid var(--accent);
     margin: 1rem 0;
     border-radius: 0.5rem;
+}
+
+.info-field {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    height: auto;
+    width: 100%;
+    font-size: 0.8rem;
+    padding-top: 0.1rem;
+    padding-bottom: 0.1rem;
+}
+
+.info-field.label {
+    font-weight: bold;
+    margin-right: 0.5rem;
+    flex-shrink: 0;
+    width: 60%;
+}
+
+.info-field.value {
+    flex-grow: 1;
+    font-weight: normal;
+    color: var(--terminal-green);
 }
 
 /* Container for API action buttons */
@@ -52,9 +78,18 @@
     /* manually defined hover color */
 }
 
+.api-action-button:disabled {
+    background-color: var(--greyed-out);
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
 /* Optionally, a simple informational text panel */
 .info-text {
-    font-size: 0.95rem;
-    line-height: 1.5;
-    margin: 0.5rem 0;
+    background-color: var(--panel);
+    font-size: 0.7rem;
+    font-family: 'Fira Mono', 'Consolas', 'Menlo', 'Monaco', monospace;
+    height: 2.8rem;
+    overflow-y: scroll;
+    color: var(--soft-terminal-green);
 }
