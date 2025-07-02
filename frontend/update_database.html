@@ -27,17 +27,28 @@
     </div>
 
     <div class="info-container">
-        <h1 class="info-header">Database Management</h1>
+        <h1 class="info-header">Database Update</h1>
         <div class="info-panel">
-            <p>The database is currently idle.</p>
+            <div class="info-field">
+                <div class="info-field label">Database Status:</div>
+                <div class="info-field value" id="updateStatus"></div>
+            </div>
+            <div class="info-field">
+                <div class="info-field label">Updated conversations:</div>
+                <div class="info-field value" id="updateLength"></div>
+            </div>
         </div>
+
         <div class="api-button-container">
-            <button class="api-action-button" onclick="postDatabaseUpdate()">Update Database</button>
-            <button class="api-action-button" onclick="fetchUpdateDatabaseStatus()">Check Status</button>
+            <button class="api-action-button" id="launchUpdateButton" onclick="postDatabaseUpdate()">Update
+                Database</button>
+            <img id="loadingIcon" src="assets/icons/loading_alpha.GIF" alt="Loading icon"
+                style="display: none; width: 2.5rem; height: 2.5rem;" />
+            <button class="api-action-button" id="abortUpdateButton">Abort</button>
+            <!-- <button class="api-action-button" onclick="fetchUpdateDatabaseStatus()">Check Status</button> -->
+            <!-- this button is not needed as the status is updated automatically -->
         </div>
-        <div class="info-text">
-            <p>This panel shows responses from the API endpoint.</p>
-        </div>
+        <div class="info-text" , id="updateNames"></div>
     </div>
 
     <!-- Include your scripts file -->
