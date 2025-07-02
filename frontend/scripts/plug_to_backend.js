@@ -63,11 +63,13 @@ async function fetchUpdateDatabaseStatus() {
         const btn = document.getElementById('launchUpdateButton');
         btn.disabled = true;
         const loadingIcon = document.getElementById('loadingIcon');
-        loadingIcon.style.display = 'inline'; // Show the loading icon
+        loadingIcon.style.visibility = 'visible';
     } else {
         // If the job is not running, re-enable the button and reset its color
         const btn = document.getElementById('launchUpdateButton');
         btn.disabled = false;
+        const loadingIcon = document.getElementById('loadingIcon');
+        loadingIcon.style.visibility = 'hidden';
     }
 }
 
