@@ -85,6 +85,16 @@
     opacity: 0.7;
 }
 
+.api-action-button.abort {
+    background-color: var(--button-red);
+    /* Use a specific color for abort actions */
+}
+
+.api-action-button.abort:hover {
+    background-color: var(--button-red-hover);
+    /* Use a specific hover color for abort actions */
+}
+
 /* Optionally, a simple informational text panel */
 .info-text {
     background-color: var(--panel);

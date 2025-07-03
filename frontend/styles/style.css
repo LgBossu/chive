@@ -13,6 +13,8 @@
     --greyed-out: #555555;
     --terminal-green: #39ff14;
     --soft-terminal-green: #88ff88;
+    --button-red: #ff4d4d;
+    --button-red-hover: #cc0000;
     --log-grey: #6f846d;
 }
 
@@ -30,6 +32,8 @@
         --greyed-out: #b0b0b0;
         --terminal-green: #19c519;
         --soft-terminal-green: #6ecb6e;
+        --button-red: #ff6666;
+        --button-red-hover: #cc0000;
         --log-grey: #435041;
     }
 }
