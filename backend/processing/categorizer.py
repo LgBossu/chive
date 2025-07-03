@@ -526,6 +526,8 @@ class CategorizerEngine:
                         total_messages=None,
                         status=JobStatus.STALLED,
                     )
+                    # Wait for the subprocess to terminate so it can set its exit code
+                    subprocess.join()
                     break
 
             logger.info("Subprocess terminated. Checking exit code.")
@@ -533,7 +535,7 @@ class CategorizerEngine:
                 logger.success("Subprocess completed normally.")
                 self.post_progress(total_messages=None, status=JobStatus.COMPLETED)
                 finished = True
-            elif subprocess.exitcode == 143:  # SIGTERM
+            elif subprocess.exitcode in (143, -15):  # SIGTERM (compliant or forced on C extensions)
                 logger.warning("Subprocess was terminated by SIGTERM. Reloading.")
                 # This is a normal exit, we can reload the subprocess
                 continue
