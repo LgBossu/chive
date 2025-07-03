@@ -50,15 +50,22 @@ class CategorizerEngine:
         import signal
         import sys
 
-        def sigkill_handler(signum, frame):
-            """
-            Handle signals to gracefully exit the subprocess.
-            """
-            logger.warning("Received SIGKILL. Exiting subprocess.")
-            sys.exit(137)  # 137 is the exit code for SIGKILL
+        def sigterm_handler(signum, frame):
+            logger.warning("Received SIGTERM. Exiting subprocess.")
+            sys.exit(143)  # 143 = 128 + 15 (SIGTERM)
+
+        def sigint_handler(signum, frame):
+            logger.warning("Received SIGINT. Exiting subprocess.")
+            sys.exit(130)  # 130 = 128 + 2 (SIGINT)
+
+        def sigabrt_handler(signum, frame):
+            logger.warning("Received SIGABRT. Exiting subprocess.")
+            sys.exit(134)  # 134 = 128 + 6 (SIGABRT)
 
         # Register signal handlers for graceful shutdown
-        signal.signal(signal.SIGKILL, sigkill_handler)  # Handle termination signals
+        signal.signal(signal.SIGTERM, sigterm_handler)
+        signal.signal(signal.SIGINT, sigint_handler)
+        signal.signal(signal.SIGABRT, sigabrt_handler)
 
         # Set up proper exiting function
         def abort_exit():
@@ -67,6 +74,13 @@ class CategorizerEngine:
             """
             logger.info("Exiting subprocess under abort signal.")
             sys.exit(46)  # 46 is a custom exit code for abort (leet speak "Ab = 46")
+
+        def finished_exit():
+            """
+            Exit the subprocess after successful completion.
+            """
+            logger.info("Exiting subprocess after successful completion.")
+            sys.exit(0)
 
         # Set up the logger for the subprocess
         logger_setup.configure_logger(
@@ -308,12 +322,13 @@ class CategorizerEngine:
         del metafile_writer
         del metafile_querier
         logger.success("Shutting down.")
+        finished_exit()  # Exit the subprocess after successful completion
 
     def __init__(
         self,
         api_endpoint: str,
         override_categorizer_model: Optional[type[CategorizerModel]] = None,
-        stalling_timeout: int = 30,
+        stalling_timeout: int = 45,
         non_faulty_stalls_max: int = 4,
     ) -> None:
         """
@@ -428,7 +443,6 @@ class CategorizerEngine:
         and if so returns the faulty message's id
 
         """
-        # TODO : refactor absolutely this function to use the API instead of text logs.
         response = get(self.api_get_status)
 
         if response.status_code != 200:
@@ -439,10 +453,10 @@ class CategorizerEngine:
         job_info = CategorizerJobInfo.model_validate(response.json())
 
         if job_info.current_message_id is None:
-            logger.error("Job current message ID is None. No stalling to check.")
+            logger.debug("Job current message ID is None. No stalling to check.")
             return None
         elif job_info.last_update is None:
-            logger.error("Job last update is None. Cannot check for timeouts.")
+            logger.debug("Job last update is None. Cannot check for timeouts.")
             return None
         else:
             elapsed_time = time() - job_info.last_update
@@ -501,7 +515,7 @@ class CategorizerEngine:
                         check_for_duplicates=True,  # Should not happen.
                         # TODO : check that it is not needed and deprecate. It is marginally costly.
                     )
-                    subprocess.kill()  # We rely on SIGKILL handlers, Unix-only.
+                    subprocess.terminate()  # We rely on SIGTERM handlers, Unix-only.
                     break
 
             logger.info("Subprocess terminated. Checking exit code.")
@@ -509,8 +523,8 @@ class CategorizerEngine:
                 logger.success("Subprocess completed normally.")
                 self.post_progress(total_messages=None, status=JobStatus.COMPLETED)
                 finished = True
-            elif subprocess.exitcode == 137:  # SIGKILL
-                logger.warning("Subprocess was terminated by SIGKILL. Reloading.")
+            elif subprocess.exitcode == 143:  # SIGTERM
+                logger.warning("Subprocess was terminated by SIGTERM. Reloading.")
                 # This is a normal exit, we can reload the subprocess
                 continue
             elif subprocess.exitcode == 46:  # Custom exit code for abort
