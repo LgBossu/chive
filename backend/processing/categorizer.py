@@ -208,6 +208,7 @@ class CategorizerEngine:
 
         logger.info(f"Starting categorization process at {display_time(starting_time)}")
         first_message = True
+
         for message_id, message_content in nonempty_uncategorized:
             message_start_time = time()
             total_processed += 1
@@ -223,6 +224,7 @@ class CategorizerEngine:
                     abort = post_status_after_message(
                         api_endpoint=api_endpoint,
                         processed_messages=0,  # No messages processed yet
+                        current_message_id=message_id,
                     )
                     first_message = False
                 else:
