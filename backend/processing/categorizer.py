@@ -69,6 +69,7 @@ class CategorizerEngine:
             last_update: Optional[float] = None,
             processed_messages: int = 1,  # Increment processed messages by 1
         ) -> None:
+            # TODO : add abort logic to the subprocess
             """
             Posts the job info to the specified URL.
             This is used to update the job status and progress in the metafile.
@@ -260,6 +261,7 @@ class CategorizerEngine:
                 )
                 last_checked_time = message_end_time
 
+        # TODO : identify the ending reason, discriminate between success, failure, and abort.
         logger.success("Categorization process completed.")
         logger.info(f"Total messages examined    : {total_processed}")
         logger.info(f"Total messages categorized : {llm_processed}")
