@@ -418,6 +418,9 @@ class CategorizerEngine:
             job_info = CategorizerJobInfo(
                 status=status,
                 total_messages=total_messages,  # Log the total number of messages to categorize
+                processed_messages=int(status == JobStatus.STALLED),
+                # If we stalled, we count the stalling message as processed,
+                # since it's getting blacklisted
                 last_update=time(),
                 current_message_id=None,  # We are not currently processing any message
             )
@@ -558,7 +561,6 @@ class CategorizerEngine:
                 logger.error(
                     "Subprocess crashed with no exit code. This happens when the process is killed by an unhandled signal."  # noqa: E501
                 )
-                self.post_progress(total_messages=None, status=JobStatus.STALLED)
                 continue  # Restart the subprocess (generally, this is a SIGKILL)
             elif subprocess.exitcode == 46:  # Custom exit code for abort
                 logger.warning(
