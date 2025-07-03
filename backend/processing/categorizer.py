@@ -512,13 +512,20 @@ class CategorizerEngine:
                 else:
                     logger.error(f"Subprocess stalled on message {faulty_id}. Killing.")
                     logger.info(f"Blacklisting message {faulty_id}")
+                    # Blacklist the faulty message
                     self.metafile_writer_type().write_single_tagline(
                         message_id=faulty_id,
                         tags=[BLACKLIST_TAG],
                         check_for_duplicates=True,  # Should not happen.
                         # TODO : check that it is not needed and deprecate. It is marginally costly.
                     )
+                    # Terminate the stalling subprocess
                     subprocess.terminate()  # We rely on SIGTERM handlers, Unix-only.
+                    # Post stalling status for user information
+                    self.post_progress(
+                        total_messages=None,
+                        status=JobStatus.STALLED,
+                    )
                     break
 
             logger.info("Subprocess terminated. Checking exit code.")
