@@ -380,7 +380,7 @@ class ChromaUpserter:
         )
 
         processed_titles: List[str] = []
-        for i, conversation in enumerate(self.conversation_loader):
+        for conversation in self.conversation_loader:
             logger.debug(f"Processing conversation: {conversation.title}")
             command = self.upsert_conversation(conversation)
             processed_titles.append(conversation.title)
