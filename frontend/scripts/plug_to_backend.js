@@ -160,8 +160,17 @@ async function fetchCategorizationStatus() {
             totalMessagesField.textContent = data.total_messages || 'N/A';
             processedMessagesField.textContent = data.processed_messages || 'N/A';
             etaField.textContent = data.eta || 'N/A';
-            lastUpdateField.textContent = data.last_update || 'N/A';
-            currentSpeedField.textContent = data.current_speed || 'N/A';
+            // Convert unix timestamp (seconds) to readable date if present
+            if (data.last_update) {
+                const date = new Date(data.last_update * 1000);
+                lastUpdateField.textContent = date.toLocaleTimeString();
+            } else {
+                lastUpdateField.textContent = 'N/A';
+            }
+            currentSpeedField.textContent =
+                (typeof data.current_speed === 'number')
+                    ? data.current_speed.toFixed(2)
+                    : (data.current_speed || 'N/A');
             infoField.innerHTML = 'Nothing to see here !';
         }
     } catch (error) {
