@@ -55,7 +55,11 @@ def categorize(log_path: Path):
     logger_setup.configure_logger(force_log_file=log_path, console_level="DEBUG")
 
     # Initialize the categorizer engine
-    categorizer_engine = CategorizerEngine(api_endpoint=f"{API_ENDPOINT}/categorizer")
+    categorizer_engine = CategorizerEngine(
+        api_endpoint=f"{API_ENDPOINT}/categorizer",
+        LOG_FILE=log_path,
+        CONSOLE_LOG_LEVEL="DEBUG",
+    )
     try:
         categorizer_engine.run_categorization()
     except Exception as e:
