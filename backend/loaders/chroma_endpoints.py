@@ -301,7 +301,6 @@ class ChromaUpserter:
             updater = UpdaterJobInfo(
                 status=status,
                 updated_conversations=updated_conversations,
-                command=post_command,
             )
             try:
                 logger.trace(
