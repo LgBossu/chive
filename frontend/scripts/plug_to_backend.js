@@ -79,7 +79,7 @@ async function fetchUpdateDatabaseStatus() {
         const btn = document.getElementById('launchUpdateButton');
         btn.disabled = true;
         const loadingIcon = document.getElementById('loadingIcon');
-        loadingIcon.src = 'assets/icons/loading_alpha.GIF';
+        loadingIcon.src = 'assets/icons/loading_alpha.gif';
     } else if (statusField.textContent === 'Aborted') {
         // If the job is aborted, re-enable the abort button
         const abortBtn = document.getElementById('abortUpdateButton');
@@ -87,13 +87,13 @@ async function fetchUpdateDatabaseStatus() {
         const runBtn = document.getElementById('launchUpdateButton');
         runBtn.disabled = false;
         const loadingIcon = document.getElementById('loadingIcon');
-        loadingIcon.src = 'assets/icons/applogo.PNG';
+        loadingIcon.src = 'assets/icons/applogo.png';
     } else {
         // If the job is not running, re-enable the button and reset its color
         const btn = document.getElementById('launchUpdateButton');
         btn.disabled = false;
         const loadingIcon = document.getElementById('loadingIcon');
-        loadingIcon.src = 'assets/icons/applogo.PNG';
+        loadingIcon.src = 'assets/icons/applogo.png';
     }
 }
 
@@ -180,7 +180,7 @@ async function fetchCategorizationStatus() {
         const btn = document.getElementById('launchCategorizationButton');
         btn.disabled = true;
         const loadingIcon = document.getElementById('loadingIcon');
-        loadingIcon.src = 'assets/icons/loading_alpha.GIF';
+        loadingIcon.src = 'assets/icons/loading_alpha.gif';
     } else if (statusField.textContent === 'Aborted') {
         // If the job is aborted, re-enable the abort button
         const abortBtn = document.getElementById('abortCategorizationButton');
@@ -188,13 +188,13 @@ async function fetchCategorizationStatus() {
         const runBtn = document.getElementById('launchCategorizationButton');
         runBtn.disabled = false;
         const loadingIcon = document.getElementById('loadingIcon');
-        loadingIcon.src = 'assets/icons/applogo.PNG';
+        loadingIcon.src = 'assets/icons/applogo.png';
     } else {
         // If the job is not running, re-enable the button and reset its color
         const btn = document.getElementById('launchCategorizationButton');
         btn.disabled = false;
         const loadingIcon = document.getElementById('loadingIcon');
-        loadingIcon.src = 'assets/icons/applogo.PNG';
+        loadingIcon.src = 'assets/icons/applogo.png';
     }
 }
 
