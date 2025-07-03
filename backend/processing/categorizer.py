@@ -1,4 +1,5 @@
 import re
+import signal
 from multiprocessing import Process, get_start_method, set_start_method
 from pathlib import Path
 from time import sleep, time
@@ -529,7 +530,13 @@ class CategorizerEngine:
                         status=JobStatus.STALLED,
                     )
                     # Wait for the subprocess to terminate so it can set its exit code
-                    subprocess.join()
+                    subprocess.join(timeout=5)
+                    # If the subprocess is still alive, we forcefully kill it
+                    if subprocess.is_alive():
+                        logger.warning(
+                            f"Subprocess {subprocess.pid} is still alive after termination. Force killing."  # noqa: E501
+                        )
+                        subprocess.kill()
                     break
 
             logger.info("Subprocess terminated. Checking exit code.")
@@ -538,7 +545,13 @@ class CategorizerEngine:
                 self.post_progress(total_messages=None, status=JobStatus.COMPLETED)
                 finished = True
             elif subprocess.exitcode in (143, -15):  # SIGTERM (compliant or forced on C extensions)
-                logger.warning("Subprocess was terminated by SIGTERM. Reloading.")
+                logger.info("Subprocess was terminated by SIGTERM. Reloading.")
+                # This is a normal exit, we can reload the subprocess
+                continue
+            elif subprocess.exitcode == -signal.SIGKILL:  # SIGKILL
+                logger.error(
+                    "Subprocess was killed by SIGKILL. Assuming it stalled in low-level code, and restarting."  # noqa: E501
+                )
                 # This is a normal exit, we can reload the subprocess
                 continue
             elif subprocess.exitcode == 46:  # Custom exit code for abort
