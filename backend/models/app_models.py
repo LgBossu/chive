@@ -12,12 +12,26 @@ class PlainResponse(BaseModel):
     message: str
 
 
+class CommandValue(Enum):
+    """Enum for command values used to instruct subprocesses to keep running or to stop."""
+
+    DEFAULT = "##DEFAULT_STATE##"
+    ABORT = "##ABORT##"
+
+
+class CommandResponse(BaseModel):
+    """A response model for commands sent to subprocesses."""
+
+    command: CommandValue
+
+
 class JobStatus(str, Enum):
     RUNNING = "Running"
     IDLE = "Idle"
     STALLED = "Stalled"
     COMPLETED = "Completed"
     FAILED = "Failed"
+    ABORTED = "Aborted"
 
 
 class CategorizerJobInfo(BaseModel):
@@ -29,8 +43,10 @@ class CategorizerJobInfo(BaseModel):
     # datetime is not json serializable, so we use a float UNIX timestamp
     current_message_id: Optional[str] = None
     current_speed: Optional[float] = None  # messages per second
+    command: CommandValue = CommandValue.DEFAULT
 
 
 class UpdaterJobInfo(BaseModel):
     status: JobStatus
     updated_conversations: List[str] = []
+    command: CommandValue = CommandValue.DEFAULT
