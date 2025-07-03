@@ -1,8 +1,21 @@
 from pathlib import Path
 
+import requests
+from loguru import logger
+
 # from backend.processing.categorizer import CategorizerEngine
 from backend.loaders.chroma_endpoints import ChromaUpserter
+from backend.models.app_models import (
+    CategorizerJobInfo,
+    CommandResponse,
+    CommandValue,
+    JobStatus,
+    PlainResponse,
+    UpdaterJobInfo,
+)
 from backend.utils.log_setup import LoggerSetup
+
+UPDATE_DB_ENDPOINT = "http://127.0.0.1:8000/update_db/update"  # TODO : do not hardcode endpoints
 
 
 def update_db(log_path: Path):
@@ -17,10 +30,19 @@ def update_db(log_path: Path):
     logger_setup.configure_logger(force_log_file=log_path)
 
     # Upsert the categorized data into the database
-    chroma_upserter = ChromaUpserter(
-        api_endpoint="http://127.0.0.1:8000/update_db/update"
-    )  # TODO : do not hardcode endpoints
-    chroma_upserter.upsert_all_conversations()
+    chroma_upserter = ChromaUpserter(api_endpoint=UPDATE_DB_ENDPOINT)
+    try:
+        chroma_upserter.upsert_all_conversations()
+    except Exception as e:
+        logger.error(f"Failed to update database: {e}")
+        failed_update = UpdaterJobInfo(
+            status=JobStatus.FAILED,
+            updated_conversations=[],
+        )
+        requests.post(
+            UPDATE_DB_ENDPOINT,
+            json=failed_update.model_dump_json(),
+        )
 
     return None
 

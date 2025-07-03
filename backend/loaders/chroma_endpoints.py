@@ -379,14 +379,16 @@ class ChromaUpserter:
             updated_conversations=[],
         )
 
-        for conversation in self.conversation_loader:
+        processed_titles: List[str] = []
+        for i, conversation in enumerate(self.conversation_loader):
             logger.debug(f"Processing conversation: {conversation.title}")
             command = self.upsert_conversation(conversation)
+            processed_titles.append(conversation.title)
             if command == CommandValue.ABORT:
                 logger.warning("Aborting upsert process as per command from API.")
                 self.post_status_update(
                     status=JobStatus.ABORTED,
-                    updated_conversations=[conv.title for conv in self.conversation_loader],
+                    updated_conversations=processed_titles,
                     post_command=CommandValue.ABORT,
                 )
                 return
