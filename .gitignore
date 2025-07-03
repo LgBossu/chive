@@ -45,6 +45,7 @@ dmypy.json
 logs/*
 data/*
 *.odg
+*.sh
 
 # Other code things
 # TODO : erase irrelevant backend/tests/* and backend/output_graphs/* from .gitignore
