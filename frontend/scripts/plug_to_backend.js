@@ -20,6 +20,22 @@ async function postDatabaseUpdate() {
     }
 }
 
+async function abortDatabaseUpdate() {
+    let ENDPOINT = API_URL + 'update_db/abort';
+
+    const btn = document.getElementById('abortUpdateButton');
+    // Disable and grey out the button
+    btn.disabled = true;
+
+    const res = await fetch(ENDPOINT, { method: 'POST' });
+
+    if (!res.ok) {
+        console.error('Error aborting job:', res.statusText);
+    } else {
+        console.log('Job commanded successfully to abort');
+    }
+}
+
 async function fetchUpdateDatabaseStatus() {
     console.log('Fetching database update status...');
 
@@ -64,6 +80,14 @@ async function fetchUpdateDatabaseStatus() {
         btn.disabled = true;
         const loadingIcon = document.getElementById('loadingIcon');
         loadingIcon.style.visibility = 'visible';
+    } else if (statusField.textContent === 'Aborted') {
+        // If the job is aborted, re-enable the abort button
+        const abortBtn = document.getElementById('abortUpdateButton');
+        abortBtn.disabled = false;
+        const runBtn = document.getElementById('launchUpdateButton');
+        runBtn.disabled = false;
+        const loadingIcon = document.getElementById('loadingIcon');
+        loadingIcon.style.visibility = 'hidden';
     } else {
         // If the job is not running, re-enable the button and reset its color
         const btn = document.getElementById('launchUpdateButton');
