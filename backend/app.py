@@ -1,3 +1,4 @@
+import logging
 import os
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -19,9 +20,24 @@ from backend.models.app_models import (
 )
 from backend.utils.log_setup import LoggerSetup
 
-# Set up logging
+# Set up user logging
 logger_setup = LoggerSetup()
 LOG_PATH = logger_setup.configure_logger()
+
+
+# [AI GENERATED CODE]
+# Filter to suppress logs for status endpoints
+class StatusEndpointFilter(logging.Filter):
+    def filter(self, record):
+        # Only filter access logs (not error logs)
+        msg = record.getMessage()
+        # Suppress logs for status endpoints
+        return not ("GET /update_db/status" in msg or "GET /categorizer/status" in msg)
+
+
+# Add the filter to the logger
+logging.getLogger("uvicorn.access").addFilter(StatusEndpointFilter())
+# [END AI GENERATED CODE]
 
 
 @dataclass
