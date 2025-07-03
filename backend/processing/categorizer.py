@@ -61,12 +61,12 @@ class CategorizerEngine:
         signal.signal(signal.SIGKILL, sigkill_handler)  # Handle termination signals
 
         # Set up proper exiting function
-        def normal_exit():
+        def abort_exit():
             """
-            Exit the subprocess normally.
+            Exit the subprocess after abort signal.
             """
-            logger.info("Exiting subprocess normally.")
-            sys.exit(0)
+            logger.info("Exiting subprocess under abort signal.")
+            sys.exit(46)  # 46 is a custom exit code for abort (leet speak "Ab = 46")
 
         # Set up the logger for the subprocess
         logger_setup.configure_logger(
@@ -228,7 +228,7 @@ class CategorizerEngine:
                     )
             if abort:
                 logger.warning("Abord signal received. Exiting categorization loop process.")
-                normal_exit()
+                abort_exit()
 
             if message_id in already_tagged_messages:
                 logger.trace(f"Message {message_id} already seen, skipping.")
@@ -382,21 +382,28 @@ class CategorizerEngine:
     # Posting info on the running job
     def post_progress(
         self,
-        total_messages: int,
+        total_messages: Optional[int],
+        status: JobStatus,  # Whether the job was aborted
     ) -> None:
         """
         Posts the progress of the categorization job to the appropriate API endpoint.
         This is used to update the job status and progress in the metafile.
         """
-        job_info = CategorizerJobInfo(
-            status=JobStatus.RUNNING,
-            total_messages=total_messages,  # Log the total number of messages to categorize
-            last_update=time(),
-            current_message_id=None,  # We are not currently processing any message
-        )
+        if status == JobStatus.ABORTED:
+            job_info = CategorizerJobInfo(
+                status=JobStatus.ABORTED,
+            )
+        else:
+            job_info = CategorizerJobInfo(
+                status=status,
+                total_messages=total_messages,  # Log the total number of messages to categorize
+                last_update=time(),
+                current_message_id=None,  # We are not currently processing any message
+            )
+
         try:
             post(
-                self.api_post_status,  # TODO : do not hardcode the actual job URL
+                self.api_post_status,
                 json=job_info.model_dump(),
             )
         except HTTPError as e:
@@ -471,7 +478,7 @@ class CategorizerEngine:
         already_tagged_messages = set(MetafileQuerier().get_all_tagged_ids())
         nonempty_array = ChromaQuerier().get_all_nonempty_messages()
         total_nonempty_uncategorized = len(set(nonempty_array[:, 0]) - already_tagged_messages)
-        self.post_progress(total_messages=total_nonempty_uncategorized)
+        self.post_progress(total_messages=total_nonempty_uncategorized, status=JobStatus.RUNNING)
 
         logger.info("Setting up persistent categorization")
         finished = False
@@ -497,15 +504,22 @@ class CategorizerEngine:
                     subprocess.kill()  # We rely on SIGKILL handlers, Unix-only.
                     break
 
-            # TODO : refactor this logic
             logger.info("Subprocess terminated. Checking exit code.")
             if subprocess.exitcode == 0:
                 logger.success("Subprocess completed normally.")
+                self.post_progress(total_messages=None, status=JobStatus.COMPLETED)
                 finished = True
             elif subprocess.exitcode == 137:  # SIGKILL
                 logger.warning("Subprocess was terminated by SIGKILL. Reloading.")
                 # This is a normal exit, we can reload the subprocess
                 continue
+            elif subprocess.exitcode == 46:  # Custom exit code for abort
+                logger.warning(
+                    "Subprocess was aborted. Exiting categorization loop and attesting reception of the signal."  # noqa: E501
+                )
+                self.post_progress(total_messages=None, status=JobStatus.ABORTED)  # Reset progress
+                finished = True
+
             else:
                 logger.error("Subprocess crashed with an unknown error or exit code.")
                 break

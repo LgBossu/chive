@@ -134,9 +134,9 @@ async def update_db_update(update: UpdaterJobInfo):
     logger.trace("Updating database job status with new information.")
 
     cache: UpdaterJobInfo = app.state.cache.update_db_cache
+
     if cache.status == JobStatus.IDLE:
         raise HTTPException(status_code=400, detail="No update in progress")
-    # Update the shared state via app.state
 
     if update.status == JobStatus.ABORTED:
         # JobStatus.ABORTED indicates the subprocess correctly aborted the job
@@ -182,7 +182,12 @@ async def categorizer_start():
 
     # Update the shared state via app.state
     cache.status = JobStatus.RUNNING
-    # TODO: reset other attributes of the cache state
+    cache.total_messages = None
+    cache.processed_messages = 0
+    cache.eta = None
+    cache.last_update = None
+    cache.current_message_id = None
+    cache.current_speed = None
 
     p = Process(target=categorize, args=(LOG_PATH,))  # Pass the log path to the categorize function
     p.start()
@@ -226,28 +231,37 @@ async def categorizer_update(update: CategorizerJobInfo):
 
     # Job status
     cache.status = update.status
-    # Total messages
-    if update.total_messages is not None:
-        cache.total_messages = max(
-            update.total_messages,
-            cache.total_messages if cache.total_messages is not None else 0,
-        )  # We retain the maximum total messages logged so far
-    # Processed messages
-    if cache.processed_messages is None:
-        cache.processed_messages = 0
-    if update.processed_messages is not None:
-        cache.processed_messages += update.processed_messages
-    # ETA
-    cache.eta = update.eta
-    # Last update time
-    if update.last_update is not None:
-        cache.last_update = update.last_update
-    # Current message ID
-    if update.current_message_id is not None:
-        cache.current_message_id = update.current_message_id
-    # Current speed
-    if update.current_speed is not None:
-        cache.current_speed = update.current_speed
+    if update.status == JobStatus.ABORTED:
+        # JobStatus.ABORTED indicates the subprocess correctly aborted the job
+        logger.info("Categorizer job was aborted.")
+        # Reset command to default after abort
+        app.state.cache.categorizer_command = CommandValue.DEFAULT
+
+    else:
+        # Regular update
+
+        # Total messages
+        if update.total_messages is not None:
+            cache.total_messages = max(
+                update.total_messages,
+                cache.total_messages if cache.total_messages is not None else 0,
+            )  # We retain the maximum total messages logged so far
+        # Processed messages
+        if cache.processed_messages is None:
+            cache.processed_messages = 0
+        if update.processed_messages is not None:
+            cache.processed_messages += update.processed_messages
+        # ETA
+        cache.eta = update.eta
+        # Last update time
+        if update.last_update is not None:
+            cache.last_update = update.last_update
+        # Current message ID
+        if update.current_message_id is not None:
+            cache.current_message_id = update.current_message_id
+        # Current speed
+        if update.current_speed is not None:
+            cache.current_speed = update.current_speed
 
     # Command value
     command: CommandValue = app.state.cache.categorizer_command

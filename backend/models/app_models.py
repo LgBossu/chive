@@ -43,10 +43,8 @@ class CategorizerJobInfo(BaseModel):
     # datetime is not json serializable, so we use a float UNIX timestamp
     current_message_id: Optional[str] = None
     current_speed: Optional[float] = None  # messages per second
-    command: CommandValue = CommandValue.DEFAULT
 
 
 class UpdaterJobInfo(BaseModel):
     status: JobStatus
     updated_conversations: List[str] = []
-    command: CommandValue = CommandValue.DEFAULT
