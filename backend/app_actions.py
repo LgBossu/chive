@@ -3,11 +3,12 @@ from pathlib import Path
 import requests
 from loguru import logger
 
-# from backend.processing.categorizer import CategorizerEngine
 from backend.loaders.chroma_endpoints import ChromaUpserter
-from backend.models.app_models import JobStatus, UpdaterJobInfo
+from backend.models.app_models import CategorizerJobInfo, JobStatus, UpdaterJobInfo
+from backend.processing.categorizer import CategorizerEngine
 from backend.utils.log_setup import LoggerSetup
 
+API_ENDPOINT = "http://127.0.0.1:8000"  # TODO : do not hardcode endpoints
 UPDATE_DB_ENDPOINT = "http://127.0.0.1:8000/update_db/update"  # TODO : do not hardcode endpoints
 
 
@@ -48,8 +49,24 @@ def categorize(log_path: Path):
     Runs the CategorizerEngine to categorize messages
     and update their status in the database.
     """
-    raise NotImplementedError(
-        "This endpoint is not implemented yet. Use /categorizer_update to update job info."
-    )
+
+    # Set up logging
+    logger_setup = LoggerSetup()
+    logger_setup.configure_logger(force_log_file=log_path)
+
+    # Initialize the categorizer engine
+    categorizer_engine = CategorizerEngine(api_endpoint=f"{API_ENDPOINT}/categorizer")
+    try:
+        categorizer_engine.run_categorization()
+    except Exception as e:
+        # Listen for errors during execution and notify the user
+        logger.error(f"Failed to categorize messages: {e}")
+        failed_categorization = CategorizerJobInfo(
+            status=JobStatus.FAILED,
+        )
+        requests.post(
+            f"{API_ENDPOINT}/categorizer/update",
+            json=failed_categorization.model_dump(),
+        )
 
     return None
