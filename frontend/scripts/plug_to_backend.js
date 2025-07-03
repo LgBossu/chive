@@ -79,7 +79,7 @@ async function fetchUpdateDatabaseStatus() {
         const btn = document.getElementById('launchUpdateButton');
         btn.disabled = true;
         const loadingIcon = document.getElementById('loadingIcon');
-        loadingIcon.style.visibility = 'visible';
+        loadingIcon.src = 'assets/icons/loading_alpha.GIF';
     } else if (statusField.textContent === 'Aborted') {
         // If the job is aborted, re-enable the abort button
         const abortBtn = document.getElementById('abortUpdateButton');
@@ -87,13 +87,13 @@ async function fetchUpdateDatabaseStatus() {
         const runBtn = document.getElementById('launchUpdateButton');
         runBtn.disabled = false;
         const loadingIcon = document.getElementById('loadingIcon');
-        loadingIcon.style.visibility = 'hidden';
+        loadingIcon.src = 'assets/icons/applogo.PNG';
     } else {
         // If the job is not running, re-enable the button and reset its color
         const btn = document.getElementById('launchUpdateButton');
         btn.disabled = false;
         const loadingIcon = document.getElementById('loadingIcon');
-        loadingIcon.style.visibility = 'hidden';
+        loadingIcon.src = 'assets/icons/applogo.PNG';
     }
 }
 
