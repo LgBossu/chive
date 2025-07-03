@@ -5,14 +5,7 @@ from loguru import logger
 
 # from backend.processing.categorizer import CategorizerEngine
 from backend.loaders.chroma_endpoints import ChromaUpserter
-from backend.models.app_models import (
-    CategorizerJobInfo,
-    CommandResponse,
-    CommandValue,
-    JobStatus,
-    PlainResponse,
-    UpdaterJobInfo,
-)
+from backend.models.app_models import JobStatus, UpdaterJobInfo
 from backend.utils.log_setup import LoggerSetup
 
 UPDATE_DB_ENDPOINT = "http://127.0.0.1:8000/update_db/update"  # TODO : do not hardcode endpoints
