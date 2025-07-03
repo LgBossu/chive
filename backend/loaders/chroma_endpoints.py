@@ -13,7 +13,7 @@ from loguru import logger
 
 from backend.loaders.conversation_loader import ConversationLoader
 from backend.loaders.conversation_parser import ConversationParser, ParsedMessage
-from backend.models.app_models import JobStatus, UpdaterJobInfo
+from backend.models.app_models import CommandValue, JobStatus, UpdaterJobInfo
 from backend.utils import hash_utils as hash_utils
 from backend.utils.path_utils import get_paths
 
@@ -288,8 +288,12 @@ class ChromaUpserter:
 
         self.conversation_loader = ConversationLoader()
 
-    def post_status_update(self, status: JobStatus, updated_conversations: List[str]) -> None:
-        # TODO : if the endpoint returns the abort message, return an abort trigger to the main loop
+    def post_status_update(
+        self,
+        status: JobStatus,
+        updated_conversations: List[str],
+        post_command: CommandValue = CommandValue.DEFAULT,
+    ) -> CommandValue:
         logger.trace("Posting status update to the API endpoint.")
 
         if self.api_endpoint is not None:
@@ -297,6 +301,7 @@ class ChromaUpserter:
             updater = UpdaterJobInfo(
                 status=status,
                 updated_conversations=updated_conversations,
+                command=post_command,
             )
             try:
                 logger.trace(
@@ -319,7 +324,15 @@ class ChromaUpserter:
                     f"Failed to update job status at {self.api_endpoint}: {e}"  # noqa: E501
                 ) from e
 
-    def upsert_conversation(self, conversation: ConversationParser) -> None:
+            command: str = response.json()["command"]
+            logger.debug(f"Received command from API: {command}")
+            return CommandValue(command)
+        else:
+            # If no API endpoint is provided, do nothing and return the default command value
+            logger.trace("No API endpoint provided, skipping status update.")
+            return CommandValue.DEFAULT
+
+    def upsert_conversation(self, conversation: ConversationParser) -> CommandValue:
         """
         Upsert a single conversation into the ChromaDB collections.
 
@@ -345,13 +358,15 @@ class ChromaUpserter:
 
         logger.success(f"Conversation '{upsertable_conv.title.title}' upserted successfully.")
 
-        self.post_status_update(
+        command = self.post_status_update(
             status=JobStatus.RUNNING,
             updated_conversations=[upsertable_conv.title.title],
         )
         logger.debug(
             f"Posted status update for conversation '{upsertable_conv.title.title}' to {self.api_endpoint}."  # noqa: E501
         )
+
+        return command
 
     def upsert_all_conversations(self) -> None:
         """
@@ -366,8 +381,15 @@ class ChromaUpserter:
 
         for conversation in self.conversation_loader:
             logger.debug(f"Processing conversation: {conversation.title}")
-            self.upsert_conversation(conversation)
-            # TODO : handle abort triggers with a break statement
+            command = self.upsert_conversation(conversation)
+            if command == CommandValue.ABORT:
+                logger.warning("Aborting upsert process as per command from API.")
+                self.post_status_update(
+                    status=JobStatus.ABORTED,
+                    updated_conversations=[conv.title for conv in self.conversation_loader],
+                    post_command=CommandValue.ABORT,
+                )
+                return
 
         logger.success("All conversations have been upserted successfully.")
         self.post_status_update(

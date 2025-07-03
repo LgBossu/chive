@@ -9,7 +9,14 @@ from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
 from backend.app_actions import categorize, update_db
-from backend.models.app_models import CategorizerJobInfo, JobStatus, PlainResponse, UpdaterJobInfo
+from backend.models.app_models import (
+    CategorizerJobInfo,
+    CommandResponse,
+    CommandValue,
+    JobStatus,
+    PlainResponse,
+    UpdaterJobInfo,
+)
 from backend.utils.log_setup import LoggerSetup
 
 # Set up logging
@@ -25,7 +32,9 @@ class Cache:
     """
 
     categorizer_cache: CategorizerJobInfo
+    categorizer_command: CommandValue
     update_db_cache: UpdaterJobInfo
+    update_db_command: CommandValue
 
 
 @asynccontextmanager
@@ -40,8 +49,10 @@ async def lifespan(app: FastAPI):
 
     # Store the caches in the app state
     app.state.cache = Cache(
-        categorizer_cache=categorizer_cache,
-        update_db_cache=update_db_cache,
+        categorizer_cache=categorizer_cache,  # type: ignore
+        categorizer_command=CommandValue.DEFAULT,  # type: ignore
+        update_db_cache=update_db_cache,  # type: ignore
+        update_db_command=CommandValue.DEFAULT,  # type: ignore
     )
     yield
     # Cleanup can be done here if needed
@@ -93,7 +104,28 @@ async def update_db_run():
     return PlainResponse(message="Database update started.")
 
 
-@app.post("/update_db/update", response_model=PlainResponse)
+@app.post("/update_db/abort", response_model=PlainResponse)
+async def update_db_abort():
+    """
+    Endpoint to abort the database update job.
+    This will set the job's command to ABORT to cleanly end the subprocess.
+    """
+    logger.trace("Aborting database update job.")
+
+    cache: UpdaterJobInfo = app.state.cache.update_db_cache
+
+    # Check if an update is in progress
+    if cache.status != JobStatus.RUNNING:
+        raise HTTPException(status_code=400, detail="No update in progress")
+
+    # Update the command to ABORT
+    app.state.cache.update_db_command = CommandValue.ABORT
+
+    # Set the status to ABORTED
+    return PlainResponse(message="Database update command set to ABORT.")
+
+
+@app.post("/update_db/update", response_model=CommandResponse)
 async def update_db_update(update: UpdaterJobInfo):
     """
     Endpoint to update the status of the database update job.
@@ -105,13 +137,23 @@ async def update_db_update(update: UpdaterJobInfo):
     if cache.status == JobStatus.IDLE:
         raise HTTPException(status_code=400, detail="No update in progress")
     # Update the shared state via app.state
-    cache.status = update.status
 
-    for conversation in update.updated_conversations:
-        if conversation not in cache.updated_conversations:
-            cache.updated_conversations.append(conversation)
+    if update.status == JobStatus.ABORTED:
+        # JobStatus.ABORTED indicates the subprocess correctly aborted the job
+        logger.info("Database update job was aborted.")
+        cache.status = JobStatus.ABORTED
+        cache.updated_conversations = update.updated_conversations
+        # Reset command to default after abort
+        app.state.cache.update_db_command = CommandValue.DEFAULT
+    else:
+        # Regular update
+        cache.status = update.status
+        for conversation in update.updated_conversations:
+            if conversation not in cache.updated_conversations:
+                cache.updated_conversations.append(conversation)
 
-    return PlainResponse(message="success")
+    command: CommandValue = app.state.cache.update_db_command
+    return CommandResponse(command=command)
 
 
 @app.get("/update_db/status", response_model=UpdaterJobInfo)
@@ -146,7 +188,28 @@ async def categorizer_start():
     return PlainResponse(message="Categorizer job started.")
 
 
-@app.post("/categorizer/update", response_model=PlainResponse)
+@app.post("/categorizer/abort", response_model=PlainResponse)
+async def categorizer_abort():
+    """
+    Endpoint to abort the categorizer job.
+    This will set the job's command to ABORT to cleanly end the subprocess.
+    """
+    logger.trace("Aborting categorizer job.")
+
+    cache: CategorizerJobInfo = app.state.cache.categorizer_cache
+
+    # Check if a categorizer job is running
+    if cache.status != JobStatus.RUNNING:
+        raise HTTPException(status_code=400, detail="No categorizer job in progress")
+
+    # Update the command to ABORT
+    app.state.cache.categorizer_command = CommandValue.ABORT
+
+    # Set the status to ABORTED
+    return PlainResponse(message="Categorizer job command set to ABORT.")
+
+
+@app.post("/categorizer/update", response_model=CommandResponse)
 async def categorizer_update(update: CategorizerJobInfo):
     """
     Endpoint to update the status of the categorizer job.
@@ -183,7 +246,9 @@ async def categorizer_update(update: CategorizerJobInfo):
     if update.current_speed is not None:
         cache.current_speed = update.current_speed
 
-    return PlainResponse(message="success")
+    # Command value
+    command: CommandValue = app.state.cache.categorizer_command
+    return CommandResponse(command=command)
 
 
 @app.get("/categorizer/status", response_model=CategorizerJobInfo)
