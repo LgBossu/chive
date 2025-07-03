@@ -554,13 +554,18 @@ class CategorizerEngine:
                 )
                 # This is a normal exit, we can reload the subprocess
                 continue
+            elif subprocess.exitcode is None:
+                logger.error(
+                    "Subprocess crashed with no exit code. This happens when the process is killed by an unhandled signal."  # noqa: E501
+                )
+                self.post_progress(total_messages=None, status=JobStatus.STALLED)
+                continue  # Restart the subprocess (generally, this is a SIGKILL)
             elif subprocess.exitcode == 46:  # Custom exit code for abort
                 logger.warning(
                     "Subprocess was aborted. Exiting categorization loop and attesting reception of the signal."  # noqa: E501
                 )
                 self.post_progress(total_messages=None, status=JobStatus.ABORTED)  # Reset progress
                 finished = True
-
             else:
                 logger.error(
                     f"Subprocess crashed with an unknown error or exit code {subprocess.exitcode}."
