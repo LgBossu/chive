@@ -12,7 +12,7 @@ class PlainResponse(BaseModel):
     message: str
 
 
-class CommandValue(Enum):
+class CommandValue(str, Enum):
     """Enum for command values used to instruct subprocesses to keep running or to stop."""
 
     DEFAULT = "##DEFAULT_STATE##"
