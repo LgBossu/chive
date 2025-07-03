@@ -52,7 +52,7 @@ def categorize(log_path: Path):
 
     # Set up logging
     logger_setup = LoggerSetup()
-    logger_setup.configure_logger(force_log_file=log_path)
+    logger_setup.configure_logger(force_log_file=log_path, console_level="DEBUG")
 
     # Initialize the categorizer engine
     categorizer_engine = CategorizerEngine(api_endpoint=f"{API_ENDPOINT}/categorizer")
