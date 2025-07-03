@@ -329,7 +329,8 @@ class CategorizerEngine:
         api_endpoint: str,
         override_categorizer_model: Optional[type[CategorizerModel]] = None,
         stalling_timeout: int = 45,
-        non_faulty_stalls_max: int = 4,
+        LOG_FILE: Optional[Path] = None,
+        CONSOLE_LOG_LEVEL: Optional[str] = "DEBUG",
     ) -> None:
         """
         Initializes the categorizer engine.
@@ -341,7 +342,10 @@ class CategorizerEngine:
         self.api_get_status = f"{self.api_url}/status"
 
         # Set up the logger
-        self.ongoing_log_file = LoggerSetup.configure_logger()
+        self.ongoing_log_file = LoggerSetup.configure_logger(
+            force_log_file=LOG_FILE,
+            console_level=CONSOLE_LOG_LEVEL,
+        )
 
         # Set the categorizer model
         if override_categorizer_model is not None:
@@ -357,9 +361,8 @@ class CategorizerEngine:
         # Set the chroma querier
         self.chroma_querier = ChromaQuerier
 
-        # Set the stalling timeout and non-faulty stalls max
+        # Set the stalling timeout
         self.stalling_timeout = stalling_timeout
-        self.non_faulty_stalls_max = non_faulty_stalls_max
 
         # Set the subprocess start method
         try:
@@ -535,7 +538,10 @@ class CategorizerEngine:
                 finished = True
 
             else:
-                logger.error("Subprocess crashed with an unknown error or exit code.")
+                logger.error(
+                    f"Subprocess crashed with an unknown error or exit code {subprocess.exitcode}."
+                )  # noqa: E501
+                self.post_progress(total_messages=None, status=JobStatus.FAILED)
                 break
 
         logger.info(f"Shutting down. Process finished under normal status : {finished}.")
