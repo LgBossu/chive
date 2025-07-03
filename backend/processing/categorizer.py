@@ -1,12 +1,11 @@
-import datetime
 import re
 from multiprocessing import Process, get_start_method, set_start_method
 from pathlib import Path
 from time import sleep, time
-from typing import Optional
+from typing import Optional, Union
 
 from loguru import logger
-from requests import ConnectionError, HTTPError, post
+from requests import ConnectionError, HTTPError, get, post
 
 from backend.loaders.chroma_endpoints import ChromaQuerier
 from backend.loaders.metafiles_handlers import (
@@ -47,6 +46,28 @@ class CategorizerEngine:
         # the categorizer model to use. We can try different models and implementations.
         api_endpoint: Optional[str] = None,
     ):
+        # Set up exit codes
+        import signal
+        import sys
+
+        def sigkill_handler(signum, frame):
+            """
+            Handle signals to gracefully exit the subprocess.
+            """
+            logger.warning("Received SIGKILL. Exiting subprocess.")
+            sys.exit(137)  # 137 is the exit code for SIGKILL
+
+        # Register signal handlers for graceful shutdown
+        signal.signal(signal.SIGKILL, sigkill_handler)  # Handle termination signals
+
+        # Set up proper exiting function
+        def normal_exit():
+            """
+            Exit the subprocess normally.
+            """
+            logger.info("Exiting subprocess normally.")
+            sys.exit(0)
+
         # Set up the logger for the subprocess
         logger_setup.configure_logger(
             # console_level="DEBUG",
@@ -68,7 +89,7 @@ class CategorizerEngine:
             current_speed: Optional[float] = None,
             last_update: Optional[float] = None,
             processed_messages: int = 1,  # Increment processed messages by 1
-        ) -> None:
+        ) -> bool:
             # TODO : add abort logic to the subprocess
             """
             Posts the job info to the specified URL.
@@ -92,13 +113,19 @@ class CategorizerEngine:
                 current_speed=current_speed,
             )
             try:
-                post(api_endpoint, json=job_info.model_dump())
+                response = post(api_endpoint, json=job_info.model_dump())
+                abort_signal = response.json()["command"]
+                return abort_signal == "##ABORT##"  # TODO : do NOT hardcode
             except HTTPError as e:
                 logger.error(f"Failed to post job progress: {e}")
+                logger.warning("The job cannot be aborted through the API. Be advised.")
             except ConnectionError as e:
                 logger.error(
                     f"Failed to connect to the job progress endpoint: {e}. Is the server running?"
                 )
+                logger.warning("The job cannot be aborted through the API. Be advised.")
+
+            return False  # Do not abort the job if the connection fails
 
         # Define time display utility
         def display_time(seconds: float, tz: int = 1, duration: bool = False) -> str:
@@ -176,9 +203,10 @@ class CategorizerEngine:
                     "No API endpoint provided for job status updates. "
                     "Job progress will not be posted."
                 )
+                abort = False  # No API endpoint, no abort signal
             else:
                 if first_message:
-                    post_status_after_message(
+                    abort = post_status_after_message(
                         api_endpoint=api_endpoint,
                         processed_messages=0,  # No messages processed yet
                     )
@@ -187,7 +215,7 @@ class CategorizerEngine:
                     average_processing_time = (
                         sum(processing_times) / len(processing_times) if processing_times else 0
                     )
-                    post_status_after_message(
+                    abort = post_status_after_message(
                         api_endpoint=api_endpoint,
                         current_message_id=message_id,
                         current_speed=average_processing_time,  # Average processing time  # noqa: E501
@@ -198,6 +226,9 @@ class CategorizerEngine:
                             duration=True,
                         ),
                     )
+            if abort:
+                logger.warning("Abord signal received. Exiting categorization loop process.")
+                normal_exit()
 
             if message_id in already_tagged_messages:
                 logger.trace(f"Message {message_id} already seen, skipping.")
@@ -237,6 +268,7 @@ class CategorizerEngine:
             processing_times.append(processing_time)
 
             if message_end_time - last_checked_time > 60 * 3:
+                # Console log every 3 minutes
                 average_processing_time = (
                     sum(processing_times) / len(processing_times) if processing_times else 0
                 )  # noqa: E501
@@ -289,7 +321,9 @@ class CategorizerEngine:
         This is a wrapper for the categorization loop.
         """
         # Set the API endpoint for job status updates
-        self.api_endpoint = api_endpoint
+        self.api_url = api_endpoint
+        self.api_post_status = f"{self.api_url}/update"
+        self.api_get_status = f"{self.api_url}/status"
 
         # Set up the logger
         self.ongoing_log_file = LoggerSetup.configure_logger()
@@ -362,7 +396,7 @@ class CategorizerEngine:
         )
         try:
             post(
-                self.api_endpoint,  # TODO : do not hardcode the actual job URL
+                self.api_post_status,  # TODO : do not hardcode the actual job URL
                 json=job_info.model_dump(),
             )
         except HTTPError as e:
@@ -381,50 +415,38 @@ class CategorizerEngine:
             raise ValueError(f"Failed to parse log line: {line}")
         return parsed.groups()[0], parsed.groups()[1]
 
-    def check_for_timeouts(self, offset: int) -> None | str:
+    def check_for_timeouts(self, timeout: int) -> Union[str, None]:
         """
-        Reads the log files to detect subprocess stalling,
+        Checks to detect subprocess stalling,
         and if so returns the faulty message's id
 
-        :param LOG_FILE: Log file to search for stalling in
-        :param timeout: Timeout in seconds to consider a subprocess stalled
-        :return: The ID of the message that caused the stalling, or None if no stalling is detected.
         """
         # TODO : refactor absolutely this function to use the API instead of text logs.
-        with open(self.ongoing_log_file, "r") as f:
-            log_content = f.readlines()
-        last_index = (
-            -(offset * 3) - 1
-        )  # Ignore the last `3*offset` lines, which are info logs on the ongoing stall
-        try:
-            self.parse_log_line(log_content[last_index])
-        except ValueError:
-            # If the line cannot be parsed, it is not a valid log line
-            last_index -= 1
-        except IndexError:
-            # If the index is out of range, we have reached the beginning of the file
-            # It is likely too early to check for stalling
+        response = get(self.api_get_status)
+
+        if response.status_code != 200:
+            logger.error(
+                f"Failed to get job status from API: {response.status_code} - {response.text}"
+            )
             return None
+        job_info = CategorizerJobInfo.model_validate(response.json())
 
-        # We have a valid log line, now we can check the last time it was logged
-        str_last_time = self.parse_log_line(log_content[last_index])[0]
-
-        date_last_time = datetime.datetime.strptime(str_last_time, "%H:%M:%S.%f")
-        if (datetime.datetime.now() - date_last_time).seconds > self.stalling_timeout:
-            # The last log entry is older than the timeout
-            id_matches = [re.search(self.log_line_hunt_id, log_content[-i]) for i in range(1, 12)]
-            # Search for the first match in the last 12 lines
-            id_match = next((match for match in id_matches if match), None)
-            if id_match:
-                return id_match.groups()[0]
-            else:
-                logger.warning(
-                    "Did not identify the faulty message from logs. Please check formatting"
-                )
-                logger.warning("Program will assume non-fatal stalling.")
-                return NO_STALLING_ID
+        if job_info.current_message_id is None:
+            logger.error("Job current message ID is None. No stalling to check.")
+            return None
+        elif job_info.last_update is None:
+            logger.error("Job last update is None. Cannot check for timeouts.")
+            return None
         else:
-            return None
+            elapsed_time = time() - job_info.last_update
+            if elapsed_time > timeout:
+                logger.warning(f"Subprocess stalled for {elapsed_time} seconds.")
+                faulty_id = job_info.current_message_id
+                logger.info(f"Faulty message ID: {faulty_id}")
+                return faulty_id
+            else:
+                logger.debug(f"Subprocess is running fine. Elapsed time: {elapsed_time} seconds.")
+                return None
 
     # Launching and running the categorization process
     def launch_categorization(self) -> Process:
@@ -436,7 +458,7 @@ class CategorizerEngine:
                 self.ongoing_log_file,
                 LoggerSetup,
                 self.categorizer_model_type,
-                self.api_endpoint,  # Pass the API endpoint for job status updates
+                self.api_post_status,  # Pass the API endpoint for job status updates
             ),
         )
         categorization_process.start()
@@ -452,31 +474,17 @@ class CategorizerEngine:
         self.post_progress(total_messages=total_nonempty_uncategorized)
 
         logger.info("Setting up persistent categorization")
-        while True:
-            non_faulty_stalls = 0
-            # TODO : check where ELSE non_faulty_stalls needs to be reset, if at all.
+        finished = False
+        while not finished:
             subprocess = self.launch_categorization()
             logger.info("Subprocess up and running. Watching for stalling.")
-            terminated = False
             while subprocess.is_alive():
-                sleep(10)
-                faulty_id = self.check_for_timeouts(offset=non_faulty_stalls)
+                sleep(self.stalling_timeout // 4)
+                faulty_id = self.check_for_timeouts(timeout=self.stalling_timeout)
+
                 if faulty_id is None:
                     continue
-                elif faulty_id == NO_STALLING_ID:
-                    non_faulty_stalls += 1
-                    if non_faulty_stalls > self.non_faulty_stalls_max:
-                        logger.error(
-                            "Subprocess stalled multiple times without identifying the faulty message. Killing."  # noqa: E501
-                        )
-                        subprocess.terminate()
-                        terminated = True
-                        break
-                    else:
-                        logger.warning(
-                            f"Subprocess stalled {non_faulty_stalls} times without identifying the faulty message. Waiting."  # noqa: E501
-                        )
-                        continue
+
                 else:
                     logger.error(f"Subprocess stalled on message {faulty_id}. Killing.")
                     logger.info(f"Blacklisting message {faulty_id}")
@@ -486,19 +494,27 @@ class CategorizerEngine:
                         check_for_duplicates=True,  # Should not happen.
                         # TODO : check that it is not needed and deprecate. It is marginally costly.
                     )
-                    subprocess.terminate()
-                    terminated = True
-                    break
-            if not terminated:
-                logger.info("Subprocess terminated by itself. Checking for completion.")
-                if subprocess.exitcode == 0:
-                    logger.success("Subprocess completed successfully.")
-                    break
-                else:
-                    logger.error("Subprocess terminated with an error")
+                    subprocess.kill()  # We rely on SIGKILL handlers, Unix-only.
                     break
 
-        logger.info("Shutting down.")
+            # TODO : refactor this logic
+            logger.info("Subprocess terminated. Checking exit code.")
+            if subprocess.exitcode == 0:
+                logger.success("Subprocess completed normally.")
+                finished = True
+            elif subprocess.exitcode == 137:  # SIGKILL
+                logger.warning("Subprocess was terminated by SIGKILL. Reloading.")
+                # This is a normal exit, we can reload the subprocess
+                continue
+            else:
+                logger.error("Subprocess crashed with an unknown error or exit code.")
+                break
+
+        logger.info(f"Shutting down. Process finished under normal status : {finished}.")
+        if not finished:
+            logger.error(
+                "Categorization process did not finish successfully. Check logs for details."
+            )
 
 
 if __name__ == "__main__":
@@ -519,7 +535,7 @@ if __name__ == "__main__":
     # Debug run
     # TODO : at some point, ask for user input to proceed OR remove the debug run script.
 
-    # RUN AUTOMATIC CATEGORIZER PIPELINE
-    logger.info("Running automatic categorizer pipeline...")
-    categorizer_engine = CategorizerEngine(api_endpoint="http://127.0.0.1:8000/categorizer_update")
-    categorizer_engine.run_categorization()
+    # # RUN AUTOMATIC CATEGORIZER PIPELINE
+    # logger.info("Running automatic categorizer pipeline...")
+    # categorizer_engine = CategorizerEngine(api_endpoint="http://127.0.0.1:8000/categorizer")
+    # categorizer_engine.run_categorization()
