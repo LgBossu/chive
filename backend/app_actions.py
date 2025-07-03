@@ -27,6 +27,7 @@ def update_db(log_path: Path):
     try:
         chroma_upserter.upsert_all_conversations()
     except Exception as e:
+        # Listen for errors during execution and notify the user
         logger.error(f"Failed to update database: {e}")
         failed_update = UpdaterJobInfo(
             status=JobStatus.FAILED,
@@ -34,7 +35,7 @@ def update_db(log_path: Path):
         )
         requests.post(
             UPDATE_DB_ENDPOINT,
-            json=failed_update.model_dump_json(),
+            json=failed_update.model_dump(),
         )
 
     return None
