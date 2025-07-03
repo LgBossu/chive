@@ -182,6 +182,7 @@ async def categorizer_start():
 
     # Update the shared state via app.state
     cache.status = JobStatus.RUNNING
+    # TODO: reset other attributes of the cache state
 
     p = Process(target=categorize, args=(LOG_PATH,))  # Pass the log path to the categorize function
     p.start()
@@ -218,6 +219,8 @@ async def categorizer_update(update: CategorizerJobInfo):
     logger.trace("Updating categorizer job status with new information.")
 
     cache: CategorizerJobInfo = app.state.cache.categorizer_cache
+
+    # TODO : account for post-abort updates, the updating logic is different
 
     ### Update fields if applicable ###
 
