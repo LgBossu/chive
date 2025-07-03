@@ -158,7 +158,12 @@ async function fetchCategorizationStatus() {
             // Update the fields with the fetched data
             statusField.textContent = data.status;
             totalMessagesField.textContent = data.total_messages || 'N/A';
-            processedMessagesField.textContent = data.processed_messages || 'N/A';
+            if (typeof data.processed_messages === 'number' && typeof data.total_messages === 'number' && data.total_messages > 0) {
+                const percent = ((data.processed_messages / data.total_messages) * 100).toFixed(2);
+                processedMessagesField.textContent = `${data.processed_messages} (${percent}%)`;
+            } else {
+                processedMessagesField.textContent = data.processed_messages || 'N/A';
+            }
             etaField.textContent = data.eta || 'N/A';
             // Convert unix timestamp (seconds) to readable date if present
             if (data.last_update) {
