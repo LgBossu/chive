@@ -519,12 +519,20 @@ class CategorizerEngine:
                     logger.error(f"Subprocess stalled on message {faulty_id}. Killing.")
                     logger.info(f"Blacklisting message {faulty_id}")
                     # Blacklist the faulty message
-                    self.metafile_writer_type().write_single_tagline(
-                        message_id=faulty_id,
-                        tags=[BLACKLIST_TAG],
-                        check_for_duplicates=True,  # Should not happen.
-                        # TODO : check that it is not needed and deprecate. It is marginally costly.
-                    )
+                    try:
+                        self.metafile_writer_type().write_single_tagline(
+                            message_id=faulty_id,
+                            tags=[BLACKLIST_TAG],
+                            check_for_duplicates=True,  # Should not happen. # Erratum : it happens.
+                            # TODO : check how and why it happens.
+                        )
+                    except RuntimeError as e:
+                        logger.error(
+                            f"Collided with a duplicate when blacklisting {faulty_id}: {e}"
+                        )
+                        # Ignore the blacklisted message, I don't know how the collision happened,
+                        # TODO : for now i'll ignore it, but investigate logs of the 04/07/25 to
+                        # try to figure it out.
                     # Terminate the stalling subprocess
                     subprocess.terminate()  # We rely on SIGTERM handlers, Unix-only.
                     # Post stalling status for user information
