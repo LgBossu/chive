@@ -289,7 +289,8 @@ class CategorizerModel(ABC):
         The method should be overridden in subclasses to ensure proper cleanup of the cache.
         """
         logger.debug("Cleaning up the categorizer model and tokenizer.")
-        del self.tokenizer
+        # del self.tokenizer
+        # TODO : check why Categorizer0 does not have a self.tokenizer to delete
         del self.model
 
     @property
