@@ -189,7 +189,7 @@ async function fetchCategorizationStatus() {
         currentSpeedField.textContent = 'error';
         infoField.textContent = `Error: ${error.message}`;
     }
-    if (statusField.textContent === 'Running') {
+    if (statusField.textContent === 'Running' || statusField.textContent === 'Stalled') {
         // If the job is running, disable the button and change its color
         const btn = document.getElementById('launchCategorizationButton');
         btn.disabled = true;
