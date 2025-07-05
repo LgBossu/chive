@@ -9,7 +9,9 @@ from backend.utils.path_utils import get_paths
 
 class ConversationLoader:
     def __init__(self):
+        logger.trace("Initializing ConversationLoader...")
         SOURCE_JSON_PATH = get_paths().source_conversations_path
+        logger.trace("Source JSON path loaded")
         self.source_path = SOURCE_JSON_PATH
 
         with open(SOURCE_JSON_PATH, "r", encoding="utf-8") as file:
@@ -19,9 +21,13 @@ class ConversationLoader:
                 logger.critical(f"Failed to decode JSON from {SOURCE_JSON_PATH}: {e}")
                 raise ValueError(f"Invalid JSON format in {SOURCE_JSON_PATH}") from e
 
+        logger.trace("Source JSON loaded successfully")
+
         self._conversations: List[ConversationParser] = [
             ConversationParser(conversation) for conversation in self.source_json
         ]
+
+        logger.trace(f"Loaded {len(self._conversations)} conversations from JSON.")
 
         self._uncategorized_conversations = list(range(len(self._conversations)))
 
@@ -88,7 +94,9 @@ class ConversationLoader:
         Make the ConversationLoader iterable.
         As each conversation is accessed through iteration, ensure it is parsed.
         """
+        logger.trace("Starting iteration over conversations.")
         for idx, conversation in enumerate(self._conversations):
+            logger.trace(f"Iterating over conversation at index {idx}.")
             if idx in self._uncategorized_conversations:
                 logger.debug(f"Parsing conversation at index {idx} during iteration.")
                 self.initialize_idx(idx)

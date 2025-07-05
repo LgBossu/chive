@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<!-- This is the main page of the prototype interface. It serves as a placeholder
+     and will be expanded with links to functional search pages and other features
+     as the project develops. -->
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Database toolkit</title>
+    <link rel="icon" type="image/x-icon" href="assets/icons/applogo.ico" />
+    <link rel="stylesheet" href="styles/style.css" />
+    <link rel="stylesheet" href="styles/info_pages.css" />
+</head>
+
+<body>
+    <div class="nav-bar">
+        <button id="homeButton" class="nav-bar nav-button" onclick="window.location.href='index.html'">
+            Home
+        </button>
+        <button id="databaseButton" class="nav-bar nav-button" onclick="window.location.href='update_database.html'"
+            disabled style="border-top: 2px solid var(--accent);">
+            Database
+        </button>
+        <button id="appButton" class="nav-bar nav-button" onclick="window.location.href='search_app.html'">
+            Search app
+        </button>
+    </div>
+
+    <div
+        style="display: flex; flex-direction: row; justify-content: center; align-items: center; gap: 2rem; padding-top: 10%;">
+        <div class="info-container">
+            <h1 class="info-header">Database Update</h1>
+            <div class="info-panel">
+                <div class="info-field">
+                    <div class="info-field label">Database Status:</div>
+                    <div class="info-field value" id="updateStatus"></div>
+                </div>
+                <div class="info-field">
+                    <div class="info-field label">Updated conversations:</div>
+                    <div class="info-field value" id="updateLength"></div>
+                </div>
+            </div>
+
+            <div class="api-button-container">
+                <button class="api-action-button" id="launchUpdateButton" onclick="postDatabaseUpdate()">
+                    Update Database
+                </button>
+                <img id="updateLoadingIcon" src="assets/icons/applogo.png" alt="Loading icon"
+                    style="width: 2.5rem; height: 2.5rem;" />
+                <button class="api-action-button abort" id="abortUpdateButton" onclick="abortDatabaseUpdate()">
+                    Abort
+                </button>
+            </div>
+            <div class="info-text" , id="updateNames"></div>
+        </div>
+
+        <div class="info-container">
+            <h1 class="info-header">Categorization</h1>
+            <div class="info-panel">
+                <div class="info-field">
+                    <div class="info-field label">Categorization Status:</div>
+                    <div class="info-field value" id="categorizationStatus"></div>
+                </div>
+                <div class="info-field">
+                    <div class="info-field label">Total messages</div>
+                    <div class="info-field value" id="totalMessages"></div>
+                </div>
+                <div class="info-field">
+                    <div class="info-field label">Processed messages</div>
+                    <div class="info-field value" id="processedMessages"></div>
+                </div>
+                <div class="info-field">
+                    <div class="info-field label">ETA</div>
+                    <div class="info-field value" id="eta"></div>
+                </div>
+                <div class="info-field">
+                    <div class="info-field label">Last update</div>
+                    <div class="info-field value" id="lastUpdate"></div>
+                </div>
+                <div class="info-field">
+                    <div class="info-field label">Current speed</div>
+                    <div class="info-field value" id="currentSpeed"></div>
+                </div>
+            </div>
+            <div class="api-button-container">
+                <button class="api-action-button" id="launchCategorizationButton" onclick="postCategorization()">Start
+                    Categorization</button>
+                <img id="categorizerLoadingIcon" src="assets/icons/applogo.png" alt="Loading icon"
+                    style="width: 2.5rem; height: 2.5rem;" />
+                <button class="api-action-button abort" id="abortCategorizationButton"
+                    onclick="abortCategorization()">Abort</button>
+            </div>
+            <div class="info-text" id="categorizationInfo">Nothing to see here !</div>
+        </div>
+    </div>
+
+    <!-- Include your scripts file -->
+    <script src="scripts/scripts.js"></script>
+    <script src="scripts/plug_to_backend.js"></script>
+</body>
+
+
+</html>

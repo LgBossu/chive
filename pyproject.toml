@@ -45,14 +45,13 @@ huggingface-hub = "*"
 # intel-extension-for-pytorch = "^2.5.0"
 optimum-intel = "^1.21.0"
 openvino = "^2024.6.0"
-bitsandbytes = {url = "https://github.com/bitsandbytes-foundation/bitsandbytes/releases/download/continuous-release_multi-backend-refactor/bitsandbytes-0.44.1.dev0-py3-none-manylinux_2_24_x86_64.whl"}
 dotenv = "^0.9.9"
 chromadb = "^0.6.3"
-opentelemetry-exporter-otlp-proto-grpc = "1.25.0"
 graphviz = "^0.20.3"
 scikit-learn = "^1.6.1"
 scikit-image = "^0.25.2"
 nbstripout = "^0.8.1"
+fastapi = "^0.115.13"
 
 
 [tool.mypy]

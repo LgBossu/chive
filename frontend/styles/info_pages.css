@@ -1,0 +1,110 @@
+/* Container for standalone info pages */
+.info-container {
+    padding: 1.5rem;
+    background-color: var(--highlight);
+    border-radius: 0.5rem;
+    box-shadow: 0 0 5px 2px rgba(0, 0, 0, 0.2);
+    margin: auto;
+    min-width: 350px;
+    /* max-width: 800px; */
+    width: 30%;
+}
+
+/* Header styling specific to info pages */
+.info-header {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+    text-align: center;
+    color: var(--text);
+}
+
+/* A panel to display status messages or API updates */
+.info-panel {
+    padding: 1rem;
+    background-color: var(--bg);
+    /* Use the global background variable for a contrasting look */
+    color: var(--text);
+    border-left: 4px solid var(--accent);
+    margin: 1rem 0;
+    border-radius: 0.5rem;
+}
+
+.info-field {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    height: auto;
+    width: 100%;
+    font-size: 0.8rem;
+    padding-top: 0.1rem;
+    padding-bottom: 0.1rem;
+}
+
+.info-field.label {
+    font-weight: bold;
+    margin-right: 0.5rem;
+    flex-shrink: 0;
+    width: 60%;
+}
+
+.info-field.value {
+    flex-grow: 1;
+    font-weight: normal;
+    color: var(--terminal-green);
+}
+
+/* Container for API action buttons */
+.api-button-container {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+/* Styling for textual API action buttons */
+.api-action-button {
+    background-color: var(--accent);
+    border: none;
+    border-radius: 0.4rem;
+    color: var(--text);
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    white-space: nowrap;
+}
+
+.api-action-button:hover {
+    background-color: var(--accent-hover);
+    /* manually defined hover color */
+}
+
+.api-action-button:disabled {
+    background-color: var(--greyed-out);
+    cursor: not-allowed;
+}
+
+.api-action-button.abort {
+    background-color: var(--button-red);
+    /* Use a specific color for abort actions */
+}
+
+.api-action-button.abort:hover {
+    background-color: var(--button-red-hover);
+    /* Use a specific hover color for abort actions */
+}
+
+.api-action-button.abort:disabled {
+    background-color: var(--greyed-out);
+    cursor: not-allowed;
+}
+
+/* Optionally, a simple informational text panel */
+.info-text {
+    background-color: var(--panel);
+    font-size: 0.7rem;
+    font-family: 'Fira Mono', 'Consolas', 'Menlo', 'Monaco', monospace;
+    height: 2.8rem;
+    overflow-y: scroll;
+    color: var(--soft-terminal-green);
+}

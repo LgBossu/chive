@@ -8,10 +8,12 @@ import chromadb
 import chromadb.api
 import chromadb.api.types
 import numpy as np
+import requests
 from loguru import logger
 
 from backend.loaders.conversation_loader import ConversationLoader
 from backend.loaders.conversation_parser import ConversationParser, ParsedMessage
+from backend.models.app_models import CommandValue, JobStatus, UpdaterJobInfo
 from backend.utils import hash_utils as hash_utils
 from backend.utils.path_utils import get_paths
 
@@ -259,7 +261,9 @@ class ChromaUpserter:
     # TODO : find a way for the script to flag or skip conversations
     # that are already in the database in entirety
 
-    def __init__(self, client: Optional[chromadb.api.ClientAPI] = None) -> None:
+    def __init__(
+        self, client: Optional[chromadb.api.ClientAPI] = None, api_endpoint: Optional[str] = None
+    ) -> None:
         """
         Initialize the ChromaUpserter with the ChromaDB client and collections.
 
@@ -280,14 +284,64 @@ class ChromaUpserter:
         self.conv_collection = self.client.get_collection(self.conv_collection_name)
         self.mess_collection = self.client.get_collection(self.mess_collection_name)
 
+        self.api_endpoint = api_endpoint
+
         self.conversation_loader = ConversationLoader()
 
-    def upsert_conversation(self, conversation: ConversationParser) -> None:
+    def post_status_update(
+        self,
+        status: JobStatus,
+        updated_conversations: List[str],
+        post_command: CommandValue = CommandValue.DEFAULT,
+    ) -> CommandValue:
+        logger.trace("Posting status update to the API endpoint.")
+
+        if self.api_endpoint is not None:
+            # If an API endpoint is provided, send a POST request to update the job status
+            updater = UpdaterJobInfo(
+                status=status,
+                updated_conversations=updated_conversations,
+            )
+            try:
+                logger.trace(
+                    f"Sending POST request to {self.api_endpoint} with data: {updater.model_dump()}"
+                )  # noqa: E501
+                response = requests.post(
+                    self.api_endpoint,
+                    json=updater.model_dump(),
+                )
+                response.raise_for_status()  # Raise an error for bad responses
+
+                logger.debug(
+                    f"Successfully updated job status at {self.api_endpoint}."  # noqa: E501
+                )
+            except requests.RequestException as e:
+                logger.error(
+                    f"Failed to update job status at {self.api_endpoint}: {e}"  # noqa: E501
+                )
+                raise requests.RequestException(
+                    f"Failed to update job status at {self.api_endpoint}: {e}"  # noqa: E501
+                ) from e
+
+            command: str = response.json()["command"]
+            logger.debug(f"Received command from API: {command}")
+            return CommandValue(command)
+        else:
+            # If no API endpoint is provided, do nothing and return the default command value
+            logger.trace("No API endpoint provided, skipping status update.")
+            return CommandValue.DEFAULT
+
+    def upsert_conversation(self, conversation: ConversationParser) -> CommandValue:
         """
         Upsert a single conversation into the ChromaDB collections.
 
         :param conversation: The ConversationParser instance containing the parsed conversation
         """
+        # TODO : check if the upsert updates the conversation.
+        # If it doesn't, we've likely reached a point of the loop where
+        # the conversations are already in the database.
+        logger.debug(f"Upserting conversation: {conversation.title}")
+
         upsertable_conv = UpsertableConversation(conversation)
         conv_data, mess_data = upsertable_conv.cast()
 
@@ -303,15 +357,46 @@ class ChromaUpserter:
 
         logger.success(f"Conversation '{upsertable_conv.title.title}' upserted successfully.")
 
+        command = self.post_status_update(
+            status=JobStatus.RUNNING,
+            updated_conversations=[upsertable_conv.title.title],
+        )
+        logger.debug(
+            f"Posted status update for conversation '{upsertable_conv.title.title}' to {self.api_endpoint}."  # noqa: E501
+        )
+
+        return command
+
     def upsert_all_conversations(self) -> None:
         """
         Upsert all conversations from the ConversationLoader into the ChromaDB collections.
         This method iterates through all conversations and upserts them one by one.
         """
         logger.info("Starting upsert of all conversations.")
+        self.post_status_update(
+            status=JobStatus.RUNNING,
+            updated_conversations=[],
+        )
+
+        processed_titles: List[str] = []
         for conversation in self.conversation_loader:
-            self.upsert_conversation(conversation)
+            logger.debug(f"Processing conversation: {conversation.title}")
+            command = self.upsert_conversation(conversation)
+            processed_titles.append(conversation.title)
+            if command == CommandValue.ABORT:
+                logger.warning("Aborting upsert process as per command from API.")
+                self.post_status_update(
+                    status=JobStatus.ABORTED,
+                    updated_conversations=processed_titles,
+                    post_command=CommandValue.ABORT,
+                )
+                return
+
         logger.success("All conversations have been upserted successfully.")
+        self.post_status_update(
+            status=JobStatus.COMPLETED,
+            updated_conversations=[conv.title for conv in self.conversation_loader],
+        )
 
 
 class ChromaQuerier:

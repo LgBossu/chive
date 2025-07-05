@@ -56,7 +56,7 @@ class MessageMetadata:
     cur_id: str
     parent_id: str | None
     children_ids: List[str]
-    timestamp: float | str | None
+    timestamp: float | str
     # TODO : CONSIDER CONVERTING THE NONE TIMESTAMP TO THE 0.0 FLOAT VALUE FOR CONSISTENCY,
     # OR A BOOL.
 
@@ -105,9 +105,11 @@ class ConversationParser:
         Initialize the parser with raw conversation data.
         Immediately parse the conversation into structured attributes.
         """
+        logger.trace("Initializing ConversationParser...")
         self._conversation_data = conversation_data
         self._title: str | None = None
         self._messages: list[ParsedMessage] | None = None
+        logger.trace("ConversationParser initialized with conversation data.")
 
     def _retrieve_key(self, jsonkey: JSONKeys) -> Any:
         """
