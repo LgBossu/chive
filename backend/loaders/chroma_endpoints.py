@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Mapping, NamedTuple, Optional, Set, Tuple, Union
+from typing import Dict, Iterable, List, Mapping, NamedTuple, Optional, Set, Tuple, Union
 
 import chromadb
 import chromadb.api
@@ -21,7 +21,9 @@ Metadata = Mapping[
     str, Union[str, int, float, bool]
 ]  # Mimic chromadb.Metadata type for easier type hinting
 
+ChromaDocument = chromadb.api.types.Document
 ChromaInclude = chromadb.api.types.IncludeEnum
+ChromaEmbedding = Union[chromadb.api.types.Embedding, chromadb.api.types.PyEmbedding]
 
 
 class UpsertMessageArgs(NamedTuple):
@@ -494,6 +496,39 @@ class ChromaQuerier:
         # we take the first (and only) list.
 
         return results
+
+    def get_conversation_by_id(
+        self, conversation_id: str
+    ) -> Iterable[Tuple[str, ChromaDocument, ChromaEmbedding, Metadata]]:
+        """
+        Retrieve a conversation by its ID from the ChromaDB messages collection.
+
+        :param conversation_id: The ID of the conversation to retrieve
+        :return: The conversation text if found, otherwise None
+        """
+        logger.debug(f"Retrieving conversation for ID: {conversation_id}")
+        query_res: chromadb.api.types.GetResult = self.mess_collection.get(
+            where={"conversation_id": conversation_id},
+            include=[ChromaInclude.documents, ChromaInclude.metadatas, ChromaInclude.embeddings],
+        )
+
+        if not query_res["ids"]:
+            raise ValueError(f"No conversation found with ID: {conversation_id}")
+
+        if not query_res["documents"] or not query_res["metadatas"] or not query_res["embeddings"]:
+            raise ValueError("Failed to retrieve messages contents, metadata or embeddings.")
+
+        try:
+            iterable_result = zip(
+                query_res["ids"],
+                query_res["documents"],
+                query_res["embeddings"],
+                query_res["metadatas"],
+            )
+            return iterable_result
+        except Exception as e:
+            logger.error(f"Error processing get result of conversation contents by ID: {e}")
+            raise ValueError("Error processing get result of conversation contents by ID.") from e
 
     def get_all_nonempty_messages(self) -> np.ndarray:
         """
