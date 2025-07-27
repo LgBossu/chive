@@ -1,4 +1,8 @@
+from json import JSONDecodeError
+from json import loads as json_loads
 from typing import Dict, List, Optional, Union
+
+from backend.loaders.chroma_endpoints import ChromaEmbedding, Metadata
 
 # TODO : document properly
 
@@ -8,12 +12,14 @@ class MessageNode:
         self,
         id: str,
         content: str,
-        embeddings: List[float],
-        metadata: Dict[str, Union[str, float, int, bool]],
+        embeddings: ChromaEmbedding,
+        metadata: Union[Metadata, Dict[str, Union[str, float, int, bool]]],
     ) -> None:
         self._id: str = id
         self._content: str = content
-        self._embeddings: List[float] = embeddings
+        self._embeddings: ChromaEmbedding = embeddings
+        if not isinstance(metadata, dict):
+            metadata = dict(metadata)
         self._metadata: Dict[str, Union[str, float, int, bool]] = metadata or {}
         # Metadata can include any additional information about the message.
         # For example, it could include timestamps, user IDs, etc.
@@ -32,15 +38,40 @@ class MessageNode:
         """Returns the content of the message node."""
         return self._content
 
-    @property
-    def embeddings(self) -> List[float]:
-        """Returns the embeddings of the message node."""
-        return self._embeddings.copy()
+    # TODO : fix below to provide a proper embedding property accounting for various embedding types supported by ChromaDB.  # noqa: E501
+    # @property
+    # def embeddings(self) -> List[float]:
+    #     """Returns the embeddings of the message node."""
+    #     return self._embeddings.copy()
 
     @property
     def metadata(self) -> Dict[str, Union[str, float, int, bool]]:
         """Returns the metadata of the message node."""
         return self._metadata.copy()
+
+    @property
+    def metadata_parent_id(self) -> Optional[str]:
+        """Returns the parent ID from the metadata, if it exists."""
+        res = self._metadata.get("parent_id", None)
+        if res is None or not isinstance(res, str):
+            raise ValueError("The 'parent_id' in metadata is unset or not a string.")
+        return res
+
+    @property
+    def metadata_children_ids(self) -> List[str]:
+        """Returns the children IDs from the metadata, if they exist."""
+        string_children = self._metadata.get("children", "[]")
+        if not isinstance(string_children, str):
+            raise ValueError("The 'children' in metadata is not a string.")
+
+        try:
+            children_ids = json_loads(string_children)
+        except JSONDecodeError:
+            raise ValueError("The 'children' in metadata is not a valid JSON string.")
+
+        if not isinstance(children_ids, list):
+            raise ValueError("The 'children' in metadata is not a list.")
+        return children_ids
 
     @property
     def branches_out(self) -> bool:
@@ -115,7 +146,6 @@ class MessageNode:
 
     # def __del__(self) -> None:
     #     """Deletes GC-wise."""
-    #     pass
 
     def delete(self) -> None:
         """Deletes the message node from the tree,
