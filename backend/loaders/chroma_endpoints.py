@@ -699,19 +699,19 @@ if __name__ == "__main__":
     # Debug run
     # TODO : at some point, ask for user input to proceed OR remove the debug run script.
 
-    # CHECK THE CURRENT COLLECTIONS' LENGTHS
-    querier = ChromaQuerier()
-    counts = querier.count_collections()
-    logger.info("Current collections' lengths:")
-    for collection_name, count in counts.items():
-        logger.info(f"{collection_name}: {count} documents")
+    # # CHECK THE CURRENT COLLECTIONS' LENGTHS
+    # querier = ChromaQuerier()
+    # counts = querier.count_collections()
+    # logger.info("Current collections' lengths:")
+    # for collection_name, count in counts.items():
+    #     logger.info(f"{collection_name}: {count} documents")
 
-    # Find and display the number of empty messages
-    empty_messages = querier.get_all_empty_messages()
-    logger.info(f"Number of empty messages: {len(empty_messages)}")
+    # # Find and display the number of empty messages
+    # empty_messages = querier.get_all_empty_messages()
+    # logger.info(f"Number of empty messages: {len(empty_messages)}")
 
-    logger.info("You can now use the ChromaDB client to query or manipulate the data.")
-    logger.info("ChromaDB client is ready for use.")
+    # logger.info("You can now use the ChromaDB client to query or manipulate the data.")
+    # logger.info("ChromaDB client is ready for use.")
 
     # # QUICKLY QUERY THE DATABASE FOR A GIVEN TEXT INPUT
     # querier = ChromaQuerier()
@@ -722,7 +722,9 @@ if __name__ == "__main__":
     #         input("Enter the text to query against the ChromaDB messages collection: ")
     #     )
 
-    # results = querier.quick_query(query_text=query_text)
+    # results = querier.quick_query(
+    #     query_text=query_text, n_results=int(input("Enter the number of results to return: "))
+    # )
 
     # for i, result in enumerate(results):
     #     print(
