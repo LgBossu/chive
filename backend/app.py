@@ -9,13 +9,14 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
-from backend.app_actions import categorize, update_db
+from backend.app_actions import categorize, search_database, update_db
 from backend.models.app_models import (
     CategorizerJobInfo,
     CommandResponse,
     CommandValue,
     JobStatus,
     PlainResponse,
+    QueryDatabaseModel,
     UpdaterJobInfo,
 )
 from backend.utils.log_setup import LoggerSetup
@@ -290,6 +291,19 @@ async def categorizer_status():
 
     cache: CategorizerJobInfo = app.state.cache.categorizer_cache
     return cache
+
+
+@app.get("/search", response_class=FileResponse)
+async def search(query: QueryDatabaseModel):
+    logger.trace(f"Searching for files with query: {query.query_text}")
+
+    # Implement your file search logic here
+    results = search_database(query, log_path=LOG_PATH)
+
+    if not results:
+        raise HTTPException(status_code=500, detail="No files found")
+
+    return results
 
 
 if __name__ == "__main__":

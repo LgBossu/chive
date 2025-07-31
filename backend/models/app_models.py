@@ -26,6 +26,8 @@ class CommandResponse(BaseModel):
 
 
 class JobStatus(str, Enum):
+    """Enum for long-running job statuses."""
+
     RUNNING = "Running"
     IDLE = "Idle"
     STALLED = "Stalled"
@@ -35,6 +37,8 @@ class JobStatus(str, Enum):
 
 
 class CategorizerJobInfo(BaseModel):
+    """When categorization is run, this model is used to track the job's status and progress."""
+
     status: JobStatus
     total_messages: Optional[int] = None
     processed_messages: Optional[int] = None
@@ -46,5 +50,19 @@ class CategorizerJobInfo(BaseModel):
 
 
 class UpdaterJobInfo(BaseModel):
+    """When updating conversations, this model is used to track the job's status and progress."""
+
     status: JobStatus
     updated_conversations: List[str] = []
+
+
+class QueryDatabaseModel(BaseModel):
+    """Model a complete request from frontend to query the database."""
+
+    query_text: str  # May be empty string
+    num_results: int = 10  # Number of results to return
+    filtered_conversations: Optional[List[str]] = None
+    # filtered_threads: Optional[List[str]] = None # Not yet implemented
+    filtered_tags: Optional[List[str]] = None
+    filtered_date_after: Optional[float] = None  # UNIX timestamp, filter messages after this date
+    filtered_date_before: Optional[float] = None  # UNIX timestamp, filter messages before this date

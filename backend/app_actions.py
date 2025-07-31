@@ -4,7 +4,12 @@ import requests
 from loguru import logger
 
 from backend.loaders.chroma_endpoints import ChromaUpserter
-from backend.models.app_models import CategorizerJobInfo, JobStatus, UpdaterJobInfo
+from backend.models.app_models import (
+    CategorizerJobInfo,
+    JobStatus,
+    QueryDatabaseModel,
+    UpdaterJobInfo,
+)
 from backend.processing.categorizer import CategorizerEngine
 from backend.utils.log_setup import LoggerSetup
 
@@ -74,3 +79,16 @@ def categorize(log_path: Path):
         )
 
     return None
+
+
+def search_database(query: QueryDatabaseModel, log_path: Path):
+    """
+    Search for messages in the database.
+
+    Sends a search query to the database and logs the results.
+    """
+    # Set up logging
+    logger_setup = LoggerSetup()
+    logger_setup.configure_logger(force_log_file=log_path)
+
+    raise NotImplementedError("Search functionality is not yet implemented.")
