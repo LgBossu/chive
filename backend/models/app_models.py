@@ -60,12 +60,12 @@ class UpdaterJobInfo(BaseModel):
 class QueryDatabaseDict(TypedDict):
     """A dictionary representation of a query to the database."""
 
+    query_embeddings: Optional[chromadb.Embeddings]
     query_texts: List[str]  # List of query texts
     n_results: int  # Number of results to return
     where: Optional[chromadb.Where]  # Filter conditions for the query
     where_document: Optional[chromadb.WhereDocument]  # Document-specific filter conditions
     include: chromadb.Include  # Fields to include in the results
-    query_embeddings: Optional[chromadb.Embeddings]
 
 
 class QueryDatabaseModel(BaseModel):
