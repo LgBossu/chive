@@ -3,7 +3,7 @@ from pathlib import Path
 import requests
 from loguru import logger
 
-from backend.loaders.chroma_endpoints import ChromaUpserter
+from backend.loaders.chroma_endpoints import ChromaQuerier, ChromaUpserter
 from backend.models.app_models import (
     CategorizerJobInfo,
     JobStatus,
@@ -90,5 +90,8 @@ def search_database(query: QueryDatabaseModel, log_path: Path):
     # Set up logging
     logger_setup = LoggerSetup()
     logger_setup.configure_logger(force_log_file=log_path)
+
+    # Initialize the ChromaQuerier
+    chroma_querier = ChromaQuerier()
 
     raise NotImplementedError("Search functionality is not yet implemented.")
