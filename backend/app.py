@@ -292,6 +292,19 @@ async def categorizer_status():
     return cache
 
 
+# @app.get("/search", response_class=FileResponse)
+# async def search(query: str):
+#     logger.trace(f"Searching for files with query: {query}")
+
+#     # Implement your file search logic here
+#     results = search_files_in_directory(query)
+
+#     if not results:
+#         raise HTTPException(status_code=404, detail="No files found")
+
+#     return results
+
+
 if __name__ == "__main__":
     import uvicorn
 

@@ -74,3 +74,16 @@ def categorize(log_path: Path):
         )
 
     return None
+
+
+# def search(query: str, log_path: Path):
+#     """
+#     Search for messages in the database.
+
+#     Sends a search query to the database and logs the results.
+#     """
+#     # Set up logging
+#     logger_setup = LoggerSetup()
+#     logger_setup.configure_logger(force_log_file=log_path)
+
+#     try:
