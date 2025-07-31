@@ -439,21 +439,45 @@ class ChromaQuerier:
 
         return res
 
+    def _flatten_query_documents(
+        self,
+        query_res: chromadb.QueryResult,
+    ) -> List[str]:
+        """
+        Parse the query result from the ChromaDB collection.
+
+        :param query_res: The query result from the ChromaDB collection
+        :param flatten: If True, flattens the result to a single list of document texts
+        :return: A list of document texts from the query result
+        :raises ValueError: If no documents are found in the query result
+        """
+        logger.debug("Parsing query result.")
+
+        if query_res["documents"] is None:
+            logger.error("No documents found in query result.")
+            raise ValueError("No documents found in query result.")
+
+        # Extract document texts from the query result
+        res = []
+        for doc in query_res["documents"]:
+            res.extend(doc)
+
+        return res
+
     def quick_query(
         self,
         query_text: str,
-        n_results: int = 10,
+        n_results: int = 25,
     ) -> List[str]:
         """
         A quick query method that returns the most relevant messages
         from the ChromaDB messages collection in order,
         for a single query text.
 
-        Aims to query for NON-EMPTY messages only (not quite implemented yet).
-        Also queries for documents that are not `[non-text content]` (not implemented either).
+        Queries for text, non-empty messages only
 
         :param query_text: The text to query against the collection
-        :param n_results: The number of results to return (default is 10)
+        :param n_results: The number of results to return (default to 25)
         :return: The most relevant message from the collection
         """
         logger.debug(f"Quick querying for text: {query_text}")
@@ -465,14 +489,11 @@ class ChromaQuerier:
 
         query_res = self._fully_query(query_model)
 
-        results = []
-        if query_res["documents"] is None:
-            logger.error("No documents found for the given query.")
-            raise ValueError("No documents found for the given query.")
-
-        results.extend(query_res["documents"][0])
-        # It returns a list of lists, but since we query only one text,
-        # we take the first (and only) list.
+        try:
+            results = self._flatten_query_documents(query_res)
+        except ValueError as e:
+            logger.error(f"Error parsing query result: {e}")
+            raise ValueError("No documents found in the query result.") from e
 
         return results
 
