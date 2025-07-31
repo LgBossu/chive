@@ -13,7 +13,7 @@ from loguru import logger
 
 from backend.loaders.conversation_loader import ConversationLoader
 from backend.loaders.conversation_parser import ConversationParser, ParsedMessage
-from backend.models.app_models import CommandValue, JobStatus, UpdaterJobInfo
+from backend.models.app_models import CommandValue, JobStatus, QueryDatabaseModel, UpdaterJobInfo
 from backend.utils import hash_utils as hash_utils
 from backend.utils.path_utils import get_paths
 
@@ -422,39 +422,18 @@ class ChromaQuerier:
 
     def _fully_query(
         self,
-        query_text: chromadb.Documents,
-        where_condition: Optional[chromadb.Where] = None,
-        where_document_condition: Optional[chromadb.WhereDocument] = None,
-        include: Optional[chromadb.Include] = None,
-        n_results: int = 100,
+        query: QueryDatabaseModel,
     ) -> chromadb.QueryResult:
         """
         A flexible wrapper for querying the ChromaDB messages collection.
 
-        :param query_text: The text to query against the collection
-        :param where_condition: Optional condition to filter results
-        :param where_document_condition: Optional condition to filter documents
-        :param include: Optional include parameters for the query
-        :param n_results: Optional number of results to return
+        :param query: The `QueryDatabaseModel` containing all query parameters
         :return: The query result from the ChromaDB collection
         """
-        logger.debug(f"Full querying for text: {query_text}")
+        logger.debug(f"Full querying for text: {query.query_text}")
 
-        if include is None:
-            res = self.mess_collection.query(
-                query_texts=query_text,
-                where=where_condition,
-                where_document=where_document_condition,
-                n_results=n_results,
-            )
-        else:
-            res = self.mess_collection.query(
-                query_texts=query_text,
-                where=where_condition,
-                where_document=where_document_condition,
-                include=include,
-                n_results=n_results,
-            )
+        query_dict = query.cast_to_query_args()
+        res: chromadb.QueryResult = self.mess_collection.query(**query_dict)
 
         logger.debug("Query completed successfully.")
 
@@ -462,12 +441,13 @@ class ChromaQuerier:
 
     def quick_query(
         self,
-        query_text: str | List[str],
+        query_text: str,
         n_results: int = 10,
     ) -> List[str]:
         """
         A quick query method that returns the most relevant messages
-        from the ChromaDB messages collection in order.
+        from the ChromaDB messages collection in order,
+        for a single query text.
 
         Aims to query for NON-EMPTY messages only (not quite implemented yet).
         Also queries for documents that are not `[non-text content]` (not implemented either).
@@ -476,15 +456,14 @@ class ChromaQuerier:
         :param n_results: The number of results to return (default is 10)
         :return: The most relevant message from the collection
         """
-        if isinstance(query_text, str):
-            query_text = [query_text]
-
         logger.debug(f"Quick querying for text: {query_text}")
-        query_res = self._fully_query(
+
+        query_model = QueryDatabaseModel(
             query_text=query_text,
-            n_results=n_results,
-            where_condition={"empty_or_non_text": False},  # Filter out empty or non-text messages
+            num_results=n_results,
         )
+
+        query_res = self._fully_query(query_model)
 
         results = []
         if query_res["documents"] is None:
