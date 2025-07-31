@@ -60,6 +60,7 @@ class QueryDatabaseModel(BaseModel):
     """Model a complete request from frontend to query the database."""
 
     query_text: str  # May be empty string
+    num_results: int = 10  # Number of results to return
     filtered_conversations: Optional[List[str]] = None
     # filtered_threads: Optional[List[str]] = None # Not yet implemented
     filtered_tags: Optional[List[str]] = None
