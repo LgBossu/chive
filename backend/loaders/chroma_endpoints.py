@@ -6,6 +6,7 @@ from typing import Dict, Iterable, List, Mapping, NamedTuple, Optional, Set, Tup
 
 import chromadb
 import chromadb.api
+import chromadb.api.configuration
 import chromadb.api.types
 import numpy as np
 import requests
@@ -430,12 +431,19 @@ class ChromaQuerier:
         :param query: The `QueryDatabaseModel` containing all query parameters
         :return: The query result from the ChromaDB collection
         """
-        logger.debug(f"Full querying for text: {query.query_text}")
+        logger.trace(f"Full querying for text: {query.query_text}")
 
         query_dict = query.cast_to_query_args()
-        res: chromadb.QueryResult = self.mess_collection.query(**query_dict)
+        try:
+            res: chromadb.QueryResult = self.mess_collection.query(**query_dict)
+        except RuntimeError as e:
+            logger.error(f"Failed to query ChromaDB: {e}")
+            logger.warning("Trying a query without metadata filtering.")
+            query_dict["where"] = None  # Remove metadata filtering
+            query_dict["where_document"] = None  # Remove document-specific filtering
+            res: chromadb.QueryResult = self.mess_collection.query(**query_dict)
 
-        logger.debug("Query completed successfully.")
+        logger.trace("Query completed successfully.")
 
         return res
 
@@ -467,7 +475,7 @@ class ChromaQuerier:
     def quick_query(
         self,
         query_text: str,
-        n_results: int = 25,
+        n_results: int = 3,
     ) -> List[str]:
         """
         A quick query method that returns the most relevant messages
@@ -635,6 +643,7 @@ class ChromaCreator:
         | None = None,
         nondefault_collection_names: Dict[str, str] | None = None,
         nondefault_db_path: str | Path | None = None,
+        hnsw_params: Optional[Dict[str, int | str]] = None,
     ) -> None:
         """
         Initializes the class with embedding functions, collection names, and database path.
@@ -648,6 +657,8 @@ class ChromaCreator:
             nondefault_db_path (str | Path | None, optional):
                 The path to the database. If None, uses the default path from get_paths().chroma_db_path.
                 If a string is provided, it is converted to a Path object.
+            hnsw_params (Dict[str, int] | None, optional): HNSW index parameters (e.g.:
+              {'hnsw:space':'cosine', 'hnsw:M': 32, 'hnsw:ef_construction': 400})
         Raises:
             ValueError: If nondefault_collection_names does not contain all required keys,
                 or if embedding_function is a tuple but does not contain exactly two functions.
@@ -687,6 +698,9 @@ class ChromaCreator:
         else:
             self.embedding_functions = embedding_function
 
+        # Handle HNSW parameters
+        self.hnsw_params = hnsw_params or {}
+
     def _create_collections(self, client: chromadb.api.ClientAPI) -> None:
         """
         Create the ChromaDB collections with the specified names.
@@ -695,9 +709,12 @@ class ChromaCreator:
         logger.info("Creating ChromaDB collections...")
         for i, key in enumerate(COLLECTIONS_NAMES.to_dict().keys()):
             collection_to_create = self.collection_names[key]
+            # # Merge HNSW params into metadata
+            # configuration = self.hnsw_params
             client.create_collection(
                 name=collection_to_create,
                 embedding_function=self.embedding_functions[i],
+                metadata=self.hnsw_params,  # Pass config with HNSW params
             )
 
     def create(self) -> chromadb.api.ClientAPI:
@@ -718,7 +735,7 @@ class ChromaCreator:
 if __name__ == "__main__":
     from backend.utils.log_setup import LoggerSetup
 
-    LoggerSetup.configure_logger()
+    LoggerSetup.configure_logger(console_level="TRACE")
 
     ANSI_CYAN = "\033[96m"
     ANSI_RESET = "\033[0m"
@@ -757,9 +774,7 @@ if __name__ == "__main__":
     #         input("Enter the text to query against the ChromaDB messages collection: ")
     #     )
 
-    # results = querier.quick_query(
-    #     query_text=query_text, n_results=int(input("Enter the number of results to return: "))
-    # )
+    # results = querier.quick_query(query_text=query_text)
 
     # for i, result in enumerate(results):
     #     print(
@@ -772,11 +787,18 @@ if __name__ == "__main__":
     #     )
     # logger.success("ChromaDB query process completed successfully.")
 
-    # # CREATE A NEW CHROMADB PERSISTENT DATABASE
-    # creator = ChromaCreator()
-    # client = creator.create()
-    # upserter = ChromaUpserter(client=client)
-    # upserter.upsert_all_conversations()
-    # logger.info("ChromaDB upsert process completed successfully.")
-    # logger.info("You can now use the ChromaDB client to query or manipulate the data.")
-    # logger.info("ChromaDB client is ready for use.")
+    # CREATE A NEW CHROMADB PERSISTENT DATABASE
+    hnsw_params = {
+        "hnsw:space": "l2",
+        "hnsw:construction_ef": 1024,
+        "hnsw:M": 128,
+        "hnsw:search_ef": 512,
+    }
+
+    creator = ChromaCreator(hnsw_params=hnsw_params)
+    client = creator.create()
+    upserter = ChromaUpserter(client=client)
+    upserter.upsert_all_conversations()
+    logger.info("ChromaDB upsert process completed successfully.")
+    logger.info("You can now use the ChromaDB client to query or manipulate the data.")
+    logger.info("ChromaDB client is ready for use.")
