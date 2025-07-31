@@ -475,7 +475,7 @@ class ChromaQuerier:
     def quick_query(
         self,
         query_text: str,
-        n_results: int = 3,
+        n_results: int = 25,
     ) -> List[str]:
         """
         A quick query method that returns the most relevant messages
@@ -787,18 +787,18 @@ if __name__ == "__main__":
     #     )
     # logger.success("ChromaDB query process completed successfully.")
 
-    # CREATE A NEW CHROMADB PERSISTENT DATABASE
-    hnsw_params = {
-        "hnsw:space": "l2",
-        "hnsw:construction_ef": 1024,
-        "hnsw:M": 128,
-        "hnsw:search_ef": 512,
-    }
+    # # CREATE A NEW CHROMADB PERSISTENT DATABASE
+    # hnsw_params = {
+    #     "hnsw:space": "l2",
+    #     "hnsw:construction_ef": 1024,
+    #     "hnsw:M": 128,
+    #     "hnsw:search_ef": 512,
+    # }
 
-    creator = ChromaCreator(hnsw_params=hnsw_params)
-    client = creator.create()
-    upserter = ChromaUpserter(client=client)
-    upserter.upsert_all_conversations()
-    logger.info("ChromaDB upsert process completed successfully.")
-    logger.info("You can now use the ChromaDB client to query or manipulate the data.")
-    logger.info("ChromaDB client is ready for use.")
+    # creator = ChromaCreator(hnsw_params=hnsw_params)
+    # client = creator.create()
+    # upserter = ChromaUpserter(client=client)
+    # upserter.upsert_all_conversations()
+    # logger.info("ChromaDB upsert process completed successfully.")
+    # logger.info("You can now use the ChromaDB client to query or manipulate the data.")
+    # logger.info("ChromaDB client is ready for use.")
