@@ -1,0 +1,7 @@
+Potential issues call for potential fixes.
+
+The chroma database `messages` collection, as of 01/08/2025, holds empty messages in great numbers, all collapsed onto the same vector embedding.
+Pre-filtering using the boolean `empty_or_non_text` metadata field, along with now upscaled HNSW parameters, helped ensure quick queries successfully run and return relevant results.
+IF ONE DAY, the database should collapse again at runtime, complaining about too low `M` or `ef` HNSW parameters, it might be a sign that the database nearest-neighbor search is being polluted by the sheer number of empty messages.
+To fix this, an elegant restructuring of the database might be to separate empty and nonempty messages in two distinct collections. This would let semantic search proceed only on relevant messages, while empty messages could be stored with their critical metadata in their own little cozy space.
+For the time being however, things seem to work. Finally.
