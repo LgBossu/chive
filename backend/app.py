@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from multiprocessing import Process
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
@@ -293,18 +293,28 @@ async def categorizer_status():
     return cache
 
 
-@app.get("/search", response_class=FileResponse)  # TODO : consider StreamingResponse
+@app.get("/search", response_class=StreamingResponse)
 async def search(query: QueryDatabaseModel):
     logger.trace(f"Searching for files with query: {query.query_text}")
 
-    # Implement your file search logic here
     trees = search_database(query, log_path=LOG_PATH)
-
     if not trees:
         raise HTTPException(status_code=500, detail="No files found")
 
-    # Return a list of JSON-serializable dicts
-    return [tree.to_dict() for tree in trees]
+    import json
+
+    def json_stream():
+        yield "["
+        first = True
+        for tree in trees:
+            if not first:
+                yield ","
+            else:
+                first = False
+            yield json.dumps(tree.to_dict())
+        yield "]"
+
+    return StreamingResponse(json_stream(), media_type="application/json")
 
 
 if __name__ == "__main__":
