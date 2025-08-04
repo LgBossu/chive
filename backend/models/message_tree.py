@@ -127,6 +127,7 @@ class MessageTree:
     def __init__(
         self,
         source: Union[MessageNode, MessageNodeSet],
+        highlights: List[str] = [],
         querier: Optional[ChromaQuerier] = None,
     ) -> None:
         """Initializes an empty message tree.
@@ -141,6 +142,7 @@ class MessageTree:
 
         Args:
             source (Union[MessageNode, MessageNodeSet]): The source message node or set of message nodes.
+            highlights (List[str], optional): A list of message IDs to highlight in the tree. Defaults to [].
             querier (Optional[ChromaQuerier]): An optional querier to fetch additional messages from the database. If not provided, a new querier will be initialized at runtime if needed (that is, if `source` is a `MessageNode` type).
         Raises:
             ValueError: If the source nodes do not form a single connected tree structure.
@@ -166,6 +168,9 @@ class MessageTree:
 
         self.root: MessageNode = source.root_node
         self.nodes: list[MessageNode] = []
+
+        # List to store message IDs that were returned by the query
+        self.highlights = highlights.copy()
 
         def _connect_and_add(node: MessageNode) -> None:
             """Recursively connects the node to its children and adds it to the nodes list."""
