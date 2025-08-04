@@ -474,6 +474,10 @@ class ChromaQuerier:
 
         return res
 
+    # TODO : go over and fix error propagation from unpack_result :
+    # certain methods expect a ValueError to be raised on empty results,
+    # unpack_result raises a ValueError on missing fields,
+    # but not on empty results.
     def _unpack_result(
         self,
         query_res: Union[chromadb.QueryResult, chromadb.api.types.GetResult],
