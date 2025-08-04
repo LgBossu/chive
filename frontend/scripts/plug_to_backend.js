@@ -1,5 +1,26 @@
 // plug_to_backend.js
 
+// TODO (frontend):
+//   The /search endpoint streams a large JSON array of message trees. For best performance and UX on the frontend,
+//   do NOT use fetch(...).then(res => res.json()), as this waits for the entire response before parsing.
+//   Instead, use a streaming JSON parser (such as oboe.js or streaming-iterators/JSONParser) to process each tree
+//   as it arrives. This allows you to:
+// - Render or process each tree incrementally (improving perceived speed)
+// - Avoid memory spikes for very large results
+// - Provide progress feedback to the user
+//   Example (with oboe.js):
+// oboe('/search?...')
+//   .node('![*]', function(tree) {
+// // Called for each tree in the array
+// // Render or process tree here
+//   })
+//   .done(function() {
+// // All trees received
+//   });
+//   If you want a pure-native solution, you must manually parse the stream using ReadableStream and chunk buffering,
+//   but this is much more complex and error-prone for JSON arrays. Use a library if possible.
+
+
 const API_URL = 'http://127.0.0.1:8000/'; // Change to your actual endpoint
 const POLL_INTERVAL_MS = 3000; // 3 seconds
 
