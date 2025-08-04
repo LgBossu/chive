@@ -102,6 +102,7 @@ class UpsertableMessages:
         :return: A dictionary containing the message ID, content, and metadata
         """
         # TODO : make the metadata a NamedTuple, or a TypedDict,
+        # URGENT TODO : make the metadata a TypedDict, like, why didn't I do it before?
         # essentially anything that requires every key to be present or something.
         # For consistency, you know.
         message_id = hash_utils.hash_message(str(message))
@@ -730,6 +731,24 @@ class ChromaQuerier:
         logger.debug(f"Retrieved {len(ids_list)} empty messages from the collection.")
 
         return np.array(ids_list, dtype=str)
+
+    def get_conversation_title(self, conversation_id: str) -> str:
+        """
+        Retrieve the title of a conversation by its ID from the ChromaDB conversations collection.
+
+        :param conversation_id: The unique identifier of the conversation to retrieve the title for.
+        :return: The title of the conversation as a string.
+        :raises ValueError: If no conversation is found with the given ID.
+        """
+        logger.debug(f"Retrieving title for conversation ID: {conversation_id}")
+        query_res = self.conv_collection.get(
+            ids=[conversation_id],
+        )
+        if not query_res["documents"]:
+            logger.error(f"No conversation found with ID: {conversation_id}")
+            raise ValueError(f"No conversation found with ID: {conversation_id}")
+
+        return query_res["documents"][0]
 
     def count_collections(self) -> Dict[str, int]:
         """
