@@ -1,8 +1,9 @@
 """To write and store models used by and for the fastapi's various endpoints."""
 
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, TypedDict
 
+import chromadb.api.types
 from pydantic import BaseModel
 
 
@@ -56,13 +57,84 @@ class UpdaterJobInfo(BaseModel):
     updated_conversations: List[str] = []
 
 
+class QueryDatabaseDict(TypedDict):
+    """A dictionary representation of a query to the database."""
+
+    query_embeddings: Optional[chromadb.Embeddings]
+    query_texts: List[str]  # List of query texts
+    n_results: int  # Number of results to return
+    where: Optional[chromadb.Where]  # Filter conditions for the query
+    where_document: Optional[chromadb.WhereDocument]  # Document-specific filter conditions
+    include: chromadb.Include  # Fields to include in the results
+
+
 class QueryDatabaseModel(BaseModel):
     """Model a complete request from frontend to query the database."""
 
-    query_text: str  # May be empty string
-    num_results: int = 10  # Number of results to return
-    filtered_conversations: Optional[List[str]] = None
-    # filtered_threads: Optional[List[str]] = None # Not yet implemented
+    query_text: str | List[str]  # May be empty string
+    num_results: int  # Number of results to return
+    filtered_conversations: Optional[List[str]] = None  # TODO : implement conversation filtering
+    # filtered_threads: Optional[List[str]] = None # Not yet available
+    # TODO : when threads are implemented, add filtering support
     filtered_tags: Optional[List[str]] = None
     filtered_date_after: Optional[float] = None  # UNIX timestamp, filter messages after this date
     filtered_date_before: Optional[float] = None  # UNIX timestamp, filter messages before this date
+    include: chromadb.Include = [
+        chromadb.api.types.IncludeEnum.documents,
+        chromadb.api.types.IncludeEnum.metadatas,
+    ]  # Fields to include in the results
+    filter_empty_or_non_text: bool = True  # Filter out empty or non-text messages
+
+    def _cast_dates_to_condition(
+        self,
+        date_after: Optional[float] = None,
+        date_before: Optional[float] = None,
+    ) -> List[chromadb.Where]:
+        """
+        Cast the date filters to a ChromaDB where condition.
+
+        :param date_after: Optional UNIX timestamp for filtering messages after this date
+        :param date_before: Optional UNIX timestamp for filtering messages before this date
+        :return: A chromadb.Where condition or None if no dates are provided
+        """
+        date_conditions = []
+        if date_after is not None:
+            date_conditions.append({"timestamp": {"$gte": date_after}})
+        if date_before is not None:
+            date_conditions.append({"timestamp": {"$lte": date_before}})
+
+        return date_conditions
+
+    def cast_to_query_args(
+        self,
+    ) -> QueryDatabaseDict:
+        query_dict = QueryDatabaseDict(
+            query_texts=[self.query_text]
+            if isinstance(self.query_text, str)
+            else self.query_text,  # Ensure query_text is a list
+            n_results=self.num_results,
+            where=None,  # Will be set later
+            where_document=None,  # Not used in this context
+            include=self.include,
+            query_embeddings=None,  # Not used in this context
+        )
+
+        where_list = []
+
+        dates_condition = self._cast_dates_to_condition(
+            date_after=self.filtered_date_after,
+            date_before=self.filtered_date_before,
+        )
+        where_list.extend(dates_condition)
+
+        if self.filter_empty_or_non_text:
+            where_list.append({"empty_or_non_text": False})
+
+        if len(where_list) > 1:
+            query_dict["where"] = {"$and": where_list}
+        elif len(where_list) == 1:
+            query_dict["where"] = where_list[0]
+        else:
+            query_dict["where"] = None
+
+        return query_dict

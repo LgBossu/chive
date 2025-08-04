@@ -6,6 +6,7 @@ from typing import Dict, Iterable, List, Mapping, NamedTuple, Optional, Set, Tup
 
 import chromadb
 import chromadb.api
+import chromadb.api.configuration
 import chromadb.api.types
 import numpy as np
 import requests
@@ -13,7 +14,7 @@ from loguru import logger
 
 from backend.loaders.conversation_loader import ConversationLoader
 from backend.loaders.conversation_parser import ConversationParser, ParsedMessage
-from backend.models.app_models import CommandValue, JobStatus, UpdaterJobInfo
+from backend.models.app_models import CommandValue, JobStatus, QueryDatabaseModel, UpdaterJobInfo
 from backend.utils import hash_utils as hash_utils
 from backend.utils.path_utils import get_paths
 
@@ -422,78 +423,85 @@ class ChromaQuerier:
 
     def _fully_query(
         self,
-        query_text: chromadb.Documents,
-        where_condition: Optional[chromadb.Where] = None,
-        where_document_condition: Optional[chromadb.WhereDocument] = None,
-        include: Optional[chromadb.Include] = None,
-        n_results: int = 100,
+        query: QueryDatabaseModel,
     ) -> chromadb.QueryResult:
         """
         A flexible wrapper for querying the ChromaDB messages collection.
 
-        :param query_text: The text to query against the collection
-        :param where_condition: Optional condition to filter results
-        :param where_document_condition: Optional condition to filter documents
-        :param include: Optional include parameters for the query
-        :param n_results: Optional number of results to return
+        :param query: The `QueryDatabaseModel` containing all query parameters
         :return: The query result from the ChromaDB collection
         """
-        logger.debug(f"Full querying for text: {query_text}")
+        logger.trace(f"Full querying for text: {query.query_text}")
 
-        if include is None:
-            res = self.mess_collection.query(
-                query_texts=query_text,
-                where=where_condition,
-                where_document=where_document_condition,
-                n_results=n_results,
-            )
-        else:
-            res = self.mess_collection.query(
-                query_texts=query_text,
-                where=where_condition,
-                where_document=where_document_condition,
-                include=include,
-                n_results=n_results,
-            )
+        query_dict = query.cast_to_query_args()
+        try:
+            res: chromadb.QueryResult = self.mess_collection.query(**query_dict)
+        except RuntimeError as e:
+            logger.error(f"Failed to query ChromaDB: {e}")
+            logger.warning("Trying a query without metadata filtering.")
+            query_dict["where"] = None  # Remove metadata filtering
+            query_dict["where_document"] = None  # Remove document-specific filtering
+            res: chromadb.QueryResult = self.mess_collection.query(**query_dict)
 
-        logger.debug("Query completed successfully.")
+        logger.trace("Query completed successfully.")
+
+        return res
+
+    def _flatten_query_documents(
+        self,
+        query_res: chromadb.QueryResult,
+    ) -> List[str]:
+        """
+        Parse the query result from the ChromaDB collection.
+
+        :param query_res: The query result from the ChromaDB collection
+        :param flatten: If True, flattens the result to a single list of document texts
+        :return: A list of document texts from the query result
+        :raises ValueError: If no documents are found in the query result
+        """
+        logger.debug("Parsing query result.")
+
+        if query_res["documents"] is None:
+            logger.error("No documents found in query result.")
+            raise ValueError("No documents found in query result.")
+
+        # Extract document texts from the query result
+        res = []
+        for doc in query_res["documents"]:
+            res.extend(doc)
 
         return res
 
     def quick_query(
         self,
-        query_text: str | List[str],
-        n_results: int = 10,
+        query_text: str,
+        n_results: int = 25,
     ) -> List[str]:
         """
         A quick query method that returns the most relevant messages
-        from the ChromaDB messages collection in order.
+        from the ChromaDB messages collection in order,
+        for a single query text.
 
-        Aims to query for NON-EMPTY messages only (not quite implemented yet).
-        Also queries for documents that are not `[non-text content]` (not implemented either).
+        Queries for text, non-empty messages only
 
         :param query_text: The text to query against the collection
-        :param n_results: The number of results to return (default is 10)
+        :param n_results: The number of results to return (default to 25)
         :return: The most relevant message from the collection
         """
-        if isinstance(query_text, str):
-            query_text = [query_text]
-
         logger.debug(f"Quick querying for text: {query_text}")
-        query_res = self._fully_query(
+
+        query_model = QueryDatabaseModel(
             query_text=query_text,
-            n_results=n_results,
-            where_condition={"empty_or_non_text": False},  # Filter out empty or non-text messages
+            num_results=n_results,
         )
 
-        results = []
-        if query_res["documents"] is None:
-            logger.error("No documents found for the given query.")
-            raise ValueError("No documents found for the given query.")
+        query_res = self._fully_query(query_model)
 
-        results.extend(query_res["documents"][0])
-        # It returns a list of lists, but since we query only one text,
-        # we take the first (and only) list.
+        try:
+            results = self._flatten_query_documents(query_res)
+        except ValueError as e:
+            logger.error(f"Error parsing query result: {e}")
+            raise ValueError("No documents found in the query result.") from e
 
         return results
 
@@ -635,6 +643,7 @@ class ChromaCreator:
         | None = None,
         nondefault_collection_names: Dict[str, str] | None = None,
         nondefault_db_path: str | Path | None = None,
+        hnsw_params: Optional[Dict[str, int | str]] = None,
     ) -> None:
         """
         Initializes the class with embedding functions, collection names, and database path.
@@ -648,6 +657,8 @@ class ChromaCreator:
             nondefault_db_path (str | Path | None, optional):
                 The path to the database. If None, uses the default path from get_paths().chroma_db_path.
                 If a string is provided, it is converted to a Path object.
+            hnsw_params (Dict[str, int] | None, optional): HNSW index parameters (e.g.:
+              {'hnsw:space':'cosine', 'hnsw:M': 32, 'hnsw:ef_construction': 400})
         Raises:
             ValueError: If nondefault_collection_names does not contain all required keys,
                 or if embedding_function is a tuple but does not contain exactly two functions.
@@ -687,6 +698,9 @@ class ChromaCreator:
         else:
             self.embedding_functions = embedding_function
 
+        # Handle HNSW parameters
+        self.hnsw_params = hnsw_params or {}
+
     def _create_collections(self, client: chromadb.api.ClientAPI) -> None:
         """
         Create the ChromaDB collections with the specified names.
@@ -695,9 +709,12 @@ class ChromaCreator:
         logger.info("Creating ChromaDB collections...")
         for i, key in enumerate(COLLECTIONS_NAMES.to_dict().keys()):
             collection_to_create = self.collection_names[key]
+            # # Merge HNSW params into metadata
+            # configuration = self.hnsw_params
             client.create_collection(
                 name=collection_to_create,
                 embedding_function=self.embedding_functions[i],
+                metadata=self.hnsw_params,  # Pass config with HNSW params
             )
 
     def create(self) -> chromadb.api.ClientAPI:
@@ -718,7 +735,7 @@ class ChromaCreator:
 if __name__ == "__main__":
     from backend.utils.log_setup import LoggerSetup
 
-    LoggerSetup.configure_logger()
+    LoggerSetup.configure_logger(console_level="TRACE")
 
     ANSI_CYAN = "\033[96m"
     ANSI_RESET = "\033[0m"
@@ -757,9 +774,7 @@ if __name__ == "__main__":
     #         input("Enter the text to query against the ChromaDB messages collection: ")
     #     )
 
-    # results = querier.quick_query(
-    #     query_text=query_text, n_results=int(input("Enter the number of results to return: "))
-    # )
+    # results = querier.quick_query(query_text=query_text)
 
     # for i, result in enumerate(results):
     #     print(
@@ -773,7 +788,14 @@ if __name__ == "__main__":
     # logger.success("ChromaDB query process completed successfully.")
 
     # # CREATE A NEW CHROMADB PERSISTENT DATABASE
-    # creator = ChromaCreator()
+    # hnsw_params = {
+    #     "hnsw:space": "l2",
+    #     "hnsw:construction_ef": 1024,
+    #     "hnsw:M": 128,
+    #     "hnsw:search_ef": 512,
+    # }
+
+    # creator = ChromaCreator(hnsw_params=hnsw_params)
     # client = creator.create()
     # upserter = ChromaUpserter(client=client)
     # upserter.upsert_all_conversations()
