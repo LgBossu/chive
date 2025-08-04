@@ -156,10 +156,7 @@ class MessageTree:
             if querier is None:
                 querier = ChromaQuerier()
 
-            all_nodes_list = [
-                MessageNode(*yielded_data)
-                for yielded_data in querier.get_conversation_by_id(conv_id)
-            ]
+            all_nodes_list = querier.get_conversation_by_id(conv_id)
 
             source = MessageNodeSet(all_nodes_list)
 

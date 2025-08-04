@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Mapping, NamedTuple, Optional, Set, Tuple, Union
+from typing import Dict, List, Mapping, NamedTuple, Optional, Set, Tuple, Union
 
 import chromadb
 import chromadb.api
@@ -15,6 +15,8 @@ from loguru import logger
 from backend.loaders.conversation_loader import ConversationLoader
 from backend.loaders.conversation_parser import ConversationParser, ParsedMessage
 from backend.models.app_models import CommandValue, JobStatus, QueryDatabaseModel, UpdaterJobInfo
+from backend.models.message_node import MessageNode
+from backend.models.message_tree import MessageTree
 from backend.utils import hash_utils as hash_utils
 from backend.utils.path_utils import get_paths
 
@@ -472,6 +474,131 @@ class ChromaQuerier:
 
         return res
 
+    def _unpack_result(
+        self,
+        query_res: Union[chromadb.QueryResult, chromadb.api.types.GetResult],
+        batch_index: int = 0,
+    ) -> List[Tuple[str, ChromaDocument, ChromaEmbedding, Metadata]]:
+        """
+        Unpack the query result from the ChromaDB collection into a list of tuples.
+
+        Each tuple contains:
+        - message ID
+        - document content
+        - embeddings
+        - metadata
+
+        To account for the fact that the query result may contain multiple batches,
+        the `batch_index` parameter is used to specify which batch to unpack.
+
+        :param query_res: The query result from the ChromaDB collection
+        :param batch_index: The index of the batch to unpack (default is 0)
+        :return: A list of tuples containing the unpacked query result
+        :raises ValueError: If the query result does not contain the expected fields
+        """
+        logger.trace("Unpacking query result.")
+
+        if not query_res["ids"]:
+            return []
+        if not query_res["documents"] or not query_res["metadatas"] or not query_res["embeddings"]:
+            raise ValueError("Failed to retrieve messages contents, metadata or embeddings.")
+        try:
+            if isinstance(query_res["ids"][0], str):
+                # If the IDs are strings, we can directly zip them (GetResult case)
+                iter_result = zip(
+                    query_res["ids"],
+                    query_res["documents"],
+                    query_res["embeddings"],
+                    query_res["metadatas"],
+                )
+            else:
+                # If the IDs are lists (batches), we need to index into them
+                # to get the specific batch we want (QueryResult case)
+                if batch_index >= len(query_res["ids"]):
+                    raise IndexError("Batch index out of range for query result.")
+                iter_result = zip(
+                    query_res["ids"][batch_index],
+                    query_res["documents"][batch_index],
+                    query_res["embeddings"][batch_index],
+                    query_res["metadatas"][batch_index],
+                )
+        except KeyError as e:
+            logger.error(f"Failed to parse query result: {e}")
+            raise ValueError("Missing required fields in the query result.") from e
+        except Exception as e:
+            logger.error(f"Error processing query result: {e}")
+            raise ValueError("Error processing query result.") from e
+
+        return list(iter_result)  # type: ignore
+        # This type ignore is exceptional, as compliance with the type checker
+        # is difficult : GetResult and QueryResult are not types, but TypedDicts,
+        # and the type checker does not understand that we are unpacking them correctly.
+        # TODO : find a way to make this static type compliant.
+
+    def _cast_query_res_to_message_nodes(
+        self,
+        query_res: Union[chromadb.QueryResult, chromadb.api.types.GetResult],
+    ) -> List[MessageNode]:
+        """
+        Parse the query result from the ChromaDB collection into MessageNode objects.
+
+        The MessageNodes are created "raw", without linking or processing.
+
+        :param query_res: The query result from the ChromaDB collection
+        :return: A list of MessageNode objects created from the query result
+        :raises ValueError: If no documents are found in the query result
+        """
+        logger.debug("Casting query result to MessageNode objects.")
+
+        iter_result = self._unpack_result(query_res)
+
+        return [MessageNode(*item) for item in iter_result]
+
+    def query_for_trees(
+        self,
+        query: QueryDatabaseModel,
+    ) -> List[MessageTree]:
+        """
+        Query the ChromaDB messages collection and cast the query result to MessageNodes,
+        to build the ambient message trees and highlight the queried messages.
+
+        :param query: The QueryDatabaseModel containing all query parameters
+        :return: A list of MessageTree objects created from the query result
+        :raises ValueError: If no documents are found in the query result
+        """
+        logger.debug(f"Querying for trees with query: {query.query_text}")
+
+        query_res = self._fully_query(query)
+
+        try:
+            message_nodes = self._cast_query_res_to_message_nodes(query_res)
+        except Exception as e:
+            logger.error(f"Error casting query result to MessageNodes: {e}")
+            raise e
+
+        # A dictionary to sort the messages by their conversation ID
+        sorter: Dict[str, List[MessageNode]] = dict()
+
+        for node in message_nodes:
+            conv_id = node.metadata.get("conv_id")
+            assert isinstance(conv_id, str), "Conversation ID must be set to a string."
+            if conv_id not in sorter:
+                sorter[conv_id] = []
+            sorter[conv_id].append(node)
+
+        trees: List[MessageTree] = []
+        for messages in sorter.values():
+            # For each conversation, create a MessageTree
+            logger.debug("Creating MessageTree for conversation")
+            tree = MessageTree(
+                source=messages[0],
+                highlights=[node.id for node in messages],
+                querier=self,
+            )
+            trees.append(tree)
+
+        return trees
+
     def quick_query(
         self,
         query_text: str,
@@ -506,37 +633,31 @@ class ChromaQuerier:
         return results
 
     def get_conversation_by_id(
-        self, conversation_id: str
-    ) -> Iterable[Tuple[str, ChromaDocument, ChromaEmbedding, Metadata]]:
+        self,
+        conversation_id: str,
+    ) -> List[MessageNode]:
         """
-        Retrieve a conversation by its ID from the ChromaDB messages collection.
+        Retrieve all messages belonging to a specific conversation from the ChromaDB messages collection.
 
-        :param conversation_id: The ID of the conversation to retrieve
-        :return: The conversation text if found, otherwise None
-        """
+        :param conversation_id: The unique identifier of the conversation to retrieve.
+
+        :return: A list of MessageNode objects representing the messages in the conversation.
+                 Returns an empty list if no messages are found for the given conversation ID.
+
+        Raises:
+            Any exceptions raised by the underlying ChromaDB API or data casting methods.
+
+        Logs:
+            Logs the retrieval attempt with the provided conversation ID at the debug level.
+        """  # noqa: E501
         logger.debug(f"Retrieving conversation for ID: {conversation_id}")
         query_res: chromadb.api.types.GetResult = self.mess_collection.get(
             where={"conversation_id": conversation_id},
             include=[ChromaInclude.documents, ChromaInclude.metadatas, ChromaInclude.embeddings],
         )
 
-        if not query_res["ids"]:
-            raise ValueError(f"No conversation found with ID: {conversation_id}")
-
-        if not query_res["documents"] or not query_res["metadatas"] or not query_res["embeddings"]:
-            raise ValueError("Failed to retrieve messages contents, metadata or embeddings.")
-
-        try:
-            iterable_result = zip(
-                query_res["ids"],
-                query_res["documents"],
-                query_res["embeddings"],
-                query_res["metadatas"],
-            )
-            return iterable_result
-        except Exception as e:
-            logger.error(f"Error processing get result of conversation contents by ID: {e}")
-            raise ValueError("Error processing get result of conversation contents by ID.") from e
+        res = self._cast_query_res_to_message_nodes(query_res)
+        return res
 
     def get_all_nonempty_messages(self) -> np.ndarray:
         """
