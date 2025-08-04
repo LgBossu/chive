@@ -1,5 +1,7 @@
 from typing import List, Optional, Tuple, Union
 
+from loguru import logger
+
 from backend.loaders.chroma_endpoints import ChromaQuerier
 from backend.models.message_node import MessageNode
 
@@ -125,10 +127,12 @@ class MessageTree:
     def to_dict(self) -> dict:
         """Return a JSON-serializable dict representation of the MessageTree."""
         return {
+            "title": self.title,
             "root": self.root.id if self.root else None,
             "nodes": [node.to_dict() for node in self.nodes],
             "highlights": self.highlights,
         }
+
     """A class representing a tree structure of messages in a conversation."""
 
     def __init__(
@@ -155,7 +159,7 @@ class MessageTree:
             ValueError: If the source nodes do not form a single connected tree structure.
         """  # noqa: E501
         if isinstance(source, MessageNode):
-            conv_id = source.metadata.get("conversation_id", None)
+            conv_id = source.metadata.get("conv_id", None)
             assert isinstance(
                 conv_id, str
             ), "Conversation ID missing from the source node or is mistyped. Cannot infer matching nodes."  # noqa: E501
@@ -175,6 +179,20 @@ class MessageTree:
 
         # List to store message IDs that were returned by the query
         self.highlights = highlights.copy()
+
+        # Determine and store the conversation title string
+        conv_id = self.root.metadata["conv_id"]
+        assert isinstance(conv_id, str), "Conversation ID must be set to a string."
+        if querier is None:
+            querier = ChromaQuerier()
+        try:
+            conv_title = querier.get_conversation_title(conversation_id=conv_id)
+        except ValueError:
+            logger.warning(
+                f"Failed to fetch conversation title for ID {conv_id}. Using generic title."
+            )
+            conv_title = None
+        self.title = conv_title if conv_title else f"Conversation {conv_id}"
 
         def _connect_and_add(node: MessageNode) -> None:
             """Recursively connects the node to its children and adds it to the nodes list."""
