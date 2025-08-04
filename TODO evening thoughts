@@ -1,0 +1,33 @@
+# TODO: Optimize streaming in conversation endpoint
+# -----------------------------------------------
+# Current behavior:
+#   - Query DB for all messages in one go
+#   - Build ALL conversation trees in memory
+#   - Stream to client by serializing trees to dicts
+#
+# Problem:
+#   - Client waits until ALL trees are built before receiving first byte
+#   - Slow perceived response for large datasets
+#
+# Goal:
+#   - Yield each tree as soon as it’s ready (build → serialize → send)
+#   - Avoid large in-memory accumulation
+#
+# Plan:
+#   1. Refactor tree-building function to work as a generator:
+#        - Fetch next conversation's messages
+#        - Build its tree
+#        - Serialize to dict
+#        - yield dict immediately
+#
+#   2. Adjust endpoint to consume this generator:
+#        - Use `yield` in Flask/FastAPI `StreamingResponse` (or equivalent)
+#        - Send chunk to client as soon as available
+#
+#   3. Client-side (JS):
+#        - Update to handle partial JSON stream (ReadableStream / async iteration)
+#        - Append/display each tree as it arrives
+#
+# Benefit:
+#   - First results visible to client much sooner
+#   - Reduced memory footprint for large conversations
