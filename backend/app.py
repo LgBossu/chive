@@ -293,17 +293,18 @@ async def categorizer_status():
     return cache
 
 
-@app.get("/search", response_class=FileResponse)
+@app.get("/search", response_class=FileResponse)  # TODO : consider StreamingResponse
 async def search(query: QueryDatabaseModel):
     logger.trace(f"Searching for files with query: {query.query_text}")
 
     # Implement your file search logic here
-    results = search_database(query, log_path=LOG_PATH)
+    trees = search_database(query, log_path=LOG_PATH)
 
-    if not results:
+    if not trees:
         raise HTTPException(status_code=500, detail="No files found")
 
-    return results
+    # Return a list of JSON-serializable dicts
+    return [tree.to_dict() for tree in trees]
 
 
 if __name__ == "__main__":

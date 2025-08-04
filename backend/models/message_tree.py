@@ -122,6 +122,13 @@ class MessageNodeSet:
 
 
 class MessageTree:
+    def to_dict(self) -> dict:
+        """Return a JSON-serializable dict representation of the MessageTree."""
+        return {
+            "root": self.root.id if self.root else None,
+            "nodes": [node.to_dict() for node in self.nodes],
+            "highlights": self.highlights,
+        }
     """A class representing a tree structure of messages in a conversation."""
 
     def __init__(

@@ -8,6 +8,20 @@ from backend.loaders.chroma_endpoints import ChromaEmbedding, Metadata
 
 
 class MessageNode:
+    def to_dict(self) -> dict:
+        """Return a JSON-serializable dict representation of the MessageNode."""
+        return {
+            "id": self._id,
+            "content": self._content,
+            "embeddings": (
+                list(self._embeddings)
+                if hasattr(self._embeddings, "__iter__")
+                else self._embeddings
+            ),
+            "metadata": self._metadata,
+            "prev": self.prev.id if self.prev else None,
+            "next": [n.id for n in self.next],
+        }
     def __init__(
         self,
         id: str,

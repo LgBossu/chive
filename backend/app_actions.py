@@ -94,4 +94,13 @@ def search_database(query: QueryDatabaseModel, log_path: Path):
     # Initialize the ChromaQuerier
     chroma_querier = ChromaQuerier()
 
+    try:
+        trees = chroma_querier.query_for_trees(query)
+    except Exception as e:
+        # Listen for errors during execution and notify the user
+        logger.error(f"Failed to search database: {e}")
+        trees = []
+
+    return trees
+
     raise NotImplementedError("Search functionality is not yet implemented.")
