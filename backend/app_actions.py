@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Dict, List, Tuple
 
 import requests
 from loguru import logger
@@ -10,6 +11,7 @@ from backend.models.app_models import (
     QueryDatabaseModel,
     UpdaterJobInfo,
 )
+from backend.models.message_node import MessageNode
 from backend.processing.categorizer import CategorizerEngine
 from backend.utils.log_setup import LoggerSetup
 
@@ -81,11 +83,12 @@ def categorize(log_path: Path):
     return None
 
 
-def search_database(query: QueryDatabaseModel, log_path: Path):
+def search_database(
+    query: QueryDatabaseModel,
+    log_path: Path,
+) -> Tuple[ChromaQuerier, Dict[str, List[MessageNode]]]:
     """
-    Search for messages in the database.
-
-    Sends a search query to the database and logs the results.
+    TODO : update docstring
     """
     # Set up logging
     logger_setup = LoggerSetup()
@@ -95,12 +98,10 @@ def search_database(query: QueryDatabaseModel, log_path: Path):
     chroma_querier = ChromaQuerier()
 
     try:
-        trees = chroma_querier.query_for_trees(query)
+        sorted_nodes: Dict[str, List[MessageNode]] = chroma_querier.query_sorted_nodes(query)
     except Exception as e:
         # Listen for errors during execution and notify the user
         logger.error(f"Failed to search database: {e}")
-        trees = []
+        sorted_nodes: Dict[str, List[MessageNode]] = dict()
 
-    return trees
-
-    raise NotImplementedError("Search functionality is not yet implemented.")
+    return chroma_querier, sorted_nodes
