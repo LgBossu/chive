@@ -299,25 +299,33 @@ async def categorizer_status():
 async def search(query: QueryDatabaseModel):
     logger.trace(f"Searching for files with query: {query.query_text}")
 
-    querier, sorted_nodes = search_database(query, log_path=LOG_PATH)
+    try:
+        querier, sorted_nodes = search_database(query, log_path=LOG_PATH)
+    except Exception as e:
+        logger.error(f"Error searching database: {e}")
+        raise HTTPException(status_code=500, detail=f"Error searching database:\n{e}")
 
     def json_stream():
         yield "["
         first = True
         for messages in sorted_nodes.values():
-            # For each conversation, create a MessageTree
-            tree = MessageTree(
-                source=messages[0],
-                highlights=[node.id for node in messages],
-                querier=querier,
-            )
+            try:
+                # For each conversation, create a MessageTree
+                tree = MessageTree(
+                    source=messages[0],
+                    highlights=[node.id for node in messages],
+                    querier=querier,
+                )
+            except Exception as e:
+                logger.error(f"Error creating MessageTree: {e}")
+                tree = {"error": str(e)}
 
             if not first:
                 yield ","
             else:
                 first = False
 
-            yield json.dumps(tree.to_dict())
+            yield json.dumps(tree if isinstance(tree, dict) else tree.to_dict())
         yield "]"
 
     return StreamingResponse(json_stream(), media_type="application/json")
