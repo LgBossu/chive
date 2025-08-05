@@ -48,6 +48,7 @@ format_text_content = {
 
 @dataclass
 class MessageMetadata:
+    # TODO : this should be a TypedDict actually
     """
     Dataclass to hold metadata for a message.
     """
