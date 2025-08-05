@@ -23,7 +23,6 @@ from backend.models.data_models import (
     UpsertableConversation,
 )
 from backend.models.message_node import MessageNode
-from backend.models.message_tree import MessageTree
 from backend.utils import hash_utils as hash_utils
 from backend.utils.path_utils import get_paths
 
@@ -415,10 +414,10 @@ class ChromaQuerier:
 
         return [MessageNode(*item) for item in iter_result]
 
-    def query_for_trees(
+    def query_sorted_nodes(
         self,
         query: QueryDatabaseModel,
-    ) -> List[MessageTree]:
+    ) -> Dict[str, List[MessageNode]]:
         """
         Query the ChromaDB messages collection and cast the query result to MessageNodes,
         to build the ambient message trees and highlight the queried messages.
@@ -447,18 +446,7 @@ class ChromaQuerier:
                 sorter[conv_id] = []
             sorter[conv_id].append(node)
 
-        trees: List[MessageTree] = []
-        for messages in sorter.values():
-            # For each conversation, create a MessageTree
-            logger.debug("Creating MessageTree for conversation")
-            tree = MessageTree(
-                source=messages[0],
-                highlights=[node.id for node in messages],
-                querier=self,
-            )
-            trees.append(tree)
-
-        return trees
+        return sorter
 
     def quick_query(
         self,
