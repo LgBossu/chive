@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -19,6 +20,7 @@ from backend.models.app_models import (
     QueryDatabaseModel,
     UpdaterJobInfo,
 )
+from backend.models.message_tree import MessageTree
 from backend.utils.log_setup import LoggerSetup
 
 # Set up user logging
@@ -297,20 +299,24 @@ async def categorizer_status():
 async def search(query: QueryDatabaseModel):
     logger.trace(f"Searching for files with query: {query.query_text}")
 
-    trees = search_database(query, log_path=LOG_PATH)
-    if not trees:
-        raise HTTPException(status_code=500, detail="No files found")
-
-    import json
+    querier, sorted_nodes = search_database(query, log_path=LOG_PATH)
 
     def json_stream():
         yield "["
         first = True
-        for tree in trees:
+        for messages in sorted_nodes.values():
+            # For each conversation, create a MessageTree
+            tree = MessageTree(
+                source=messages[0],
+                highlights=[node.id for node in messages],
+                querier=querier,
+            )
+
             if not first:
                 yield ","
             else:
                 first = False
+
             yield json.dumps(tree.to_dict())
         yield "]"
 
