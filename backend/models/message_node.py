@@ -2,7 +2,7 @@ from json import JSONDecodeError
 from json import loads as json_loads
 from typing import Dict, List, Optional, Union
 
-from backend.loaders.chroma_endpoints import ChromaEmbedding, Metadata
+from backend.models.data_models import ChromaEmbedding, Metadata
 
 # TODO : document properly
 
@@ -22,6 +22,7 @@ class MessageNode:
             "prev": self.prev.id if self.prev else None,
             "next": [n.id for n in self.next],
         }
+
     def __init__(
         self,
         id: str,
