@@ -88,8 +88,16 @@ def search_database(
     log_path: Path,
 ) -> Tuple[ChromaQuerier, Dict[str, List[MessageNode]]]:
     """
-    TODO : update docstring
-    """
+    Search the database for messages matching the given query.
+
+    Args:
+        query (QueryDatabaseModel): The query parameters for searching the database.
+        log_path (Path): The path to the log file.
+
+    Returns:
+        Tuple[ChromaQuerier, Dict[str, List[MessageNode]]]:
+            A tuple containing the ChromaQuerier instance and a dictionary mapping categories to lists of MessageNode objects.
+    """  # noqa: E501
     # Set up logging
     logger_setup = LoggerSetup()
     logger_setup.configure_logger(force_log_file=log_path)
