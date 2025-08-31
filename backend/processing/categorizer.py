@@ -86,7 +86,7 @@ class CategorizerEngine:
 
         # Set up the logger for the subprocess
         logger_setup.configure_logger(
-            console_level="DEBUG",
+            # console_level="DEBUG",
             force_log_file=LOG_FILE,
         )
         logger.info("Subprocess logger set up")
@@ -169,13 +169,13 @@ class CategorizerEngine:
                     usage_mb = usage_kb / 1024
                     if usage_mb > 1_000:
                         usage_gb = usage_mb / 1024
-                        logger.debug(f"[MEM] {label}: ru_maxrss={usage_gb:.3f} GB")
+                        logger.info(f"[MEM] {label}: ru_maxrss={usage_gb:.3f} GB")
                     else:
-                        logger.debug(f"[MEM] {label}: ru_maxrss={usage_mb:.3f} MB")
+                        logger.info(f"[MEM] {label}: ru_maxrss={usage_mb:.3f} MB")
                 else:
-                    logger.debug(f"[MEM] {label}: ru_maxrss={usage_kb} KB")
+                    logger.info(f"[MEM] {label}: ru_maxrss={usage_kb} KB")
             except Exception as e:
-                logger.debug(f"Failed to take memory snapshot: {e}")
+                logger.info(f"Failed to take memory snapshot: {e}")
 
         # Instantiate the categorizer and latent models within the subprocess
         mem_snapshot("before model instantiation")
