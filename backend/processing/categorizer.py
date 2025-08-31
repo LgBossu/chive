@@ -166,11 +166,11 @@ class CategorizerEngine:
                     usage_mb = usage_kb / 1024
                     if usage_mb > 1_000:
                         usage_gb = usage_mb / 1024
-                        logger.info(f"[MEM] {label}: ru_maxrss={usage_gb:.3f} GB")
+                        logger.debug(f"[MEM] {label}: ru_maxrss={usage_gb:.3f} GB")
                     else:
-                        logger.info(f"[MEM] {label}: ru_maxrss={usage_mb:.3f} MB")
+                        logger.debug(f"[MEM] {label}: ru_maxrss={usage_mb:.3f} MB")
                 else:
-                    logger.info(f"[MEM] {label}: ru_maxrss={usage_kb} KB")
+                    logger.debug(f"[MEM] {label}: ru_maxrss={usage_kb} KB")
             except Exception as e:
                 logger.debug(f"Failed to take memory snapshot: {e}")
 
