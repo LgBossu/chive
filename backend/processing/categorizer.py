@@ -86,7 +86,7 @@ class CategorizerEngine:
 
         # Set up the logger for the subprocess
         logger_setup.configure_logger(
-            # console_level="DEBUG",
+            console_level="DEBUG",
             force_log_file=LOG_FILE,
         )
         logger.info("Subprocess logger set up")
@@ -561,6 +561,9 @@ class CategorizerEngine:
         # We don't know exact overlap without fetching ids; conservatively approximate
         # to display progress: total_nonempty_uncategorized = total_nonempty - already_tagged_count
         total_nonempty_uncategorized = max(0, total_nonempty - already_tagged_count)
+        logger.info(
+            f"Initial job information retrieved: {total_nonempty_uncategorized} messages to process. Posting..."  # noqa: E501
+        )
         self.post_progress(total_messages=total_nonempty_uncategorized, status=JobStatus.RUNNING)
 
         # Close parent-side queriers to avoid keeping large resources alive
