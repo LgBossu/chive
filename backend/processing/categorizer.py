@@ -1,3 +1,4 @@
+import gc
 import re
 import resource
 import signal
@@ -629,7 +630,46 @@ class CategorizerEngine:
                             f"Subprocess {subprocess.pid} is still alive after termination. Force killing."  # noqa: E501
                         )
                         subprocess.kill()
-                    break
+                        try:
+                            subprocess.join(timeout=5)
+                        except Exception:
+                            # Best-effort join after killing; proceed with cleanup anyway
+                            pass
+
+                    # Parent-side cleanup: try to release resources held by the Process object
+                    try:
+                        # Ensure any child-related resources are reclaimed by Python
+                        gc.collect()
+                    except Exception:
+                        logger.debug("Parent GC collecteion failed or raised an exception.")
+
+                    try:
+                        # Close the underlying FD/resources of the Process object (Python 3.8+)
+                        if hasattr(subprocess, "close"):
+                            subprocess.close()
+                    except Exception as e:
+                        logger.debug(f"Failed to close subprocess resources: {e}")
+
+                    # Log a parent memory snapshot to help detect gradual growth
+                    try:
+                        usage_kb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+                        if usage_kb > 1_000:
+                            usage_mb = usage_kb / 1024
+                            if usage_mb > 1_000:
+                                usage_gb = usage_mb / 1024
+                                logger.info(
+                                    f"[PARENT MEM] after subprocess: ru_maxrss={usage_gb:.3f} GB"
+                                )
+                            else:
+                                logger.info(
+                                    f"[PARENT MEM] after subprocess: ru_maxrss={usage_mb:.3f} MB"
+                                )
+                        else:
+                            logger.info(f"[PARENT MEM] after subprocess: ru_maxrss={usage_kb} KB")
+                    except Exception as e:
+                        logger.debug(f"Failed to take parent memory snapshot: {e}")
+
+                    break  # Break the inner loop to restart the subprocess
 
             logger.info("Subprocess terminated. Checking exit code.")
             if subprocess.exitcode == 0:
