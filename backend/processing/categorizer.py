@@ -156,11 +156,21 @@ class CategorizerEngine:
             seconds = int(seconds)
             return f"{int(hours)}h {int(minutes)}m {seconds}s {int(milliseconds)}ms"
 
-        # Simple memory snapshot helper (reports ru_maxrss in kilobytes on Linux)
         def mem_snapshot(label: str) -> None:
+            """
+            Simple memory snapshot helper (reports ru_maxrss in GB/MB/KB on Linux)
+            """
             try:
                 usage_kb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-                logger.info(f"[MEM] {label}: ru_maxrss={usage_kb} KB")
+                if usage_kb > 1_000:
+                    usage_mb = usage_kb / 1024
+                    if usage_mb > 1_000:
+                        usage_gb = usage_mb / 1024
+                        logger.info(f"[MEM] {label}: ru_maxrss={usage_gb:.3f} GB")
+                    else:
+                        logger.info(f"[MEM] {label}: ru_maxrss={usage_mb:.3f} MB")
+                else:
+                    logger.info(f"[MEM] {label}: ru_maxrss={usage_kb} KB")
             except Exception as e:
                 logger.debug(f"Failed to take memory snapshot: {e}")
 
