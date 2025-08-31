@@ -105,6 +105,7 @@ class CategorizerEngine:
             current_speed: Optional[float] = None,
             last_update: Optional[float] = None,
             processed_messages: int = 1,  # Increment processed messages by 1
+            total_messages: Optional[int] = None,
         ) -> bool:
             # TODO : add abort logic to the subprocess
             """
@@ -121,7 +122,9 @@ class CategorizerEngine:
                 last_update = time()
             job_info = CategorizerJobInfo(
                 status=JobStatus.RUNNING,
-                total_messages=None,  # This was set at the beginning of the job
+                total_messages=total_messages,  # This was set at the beginning of the job
+                # TODO : this is a temporary fix : we post total messages from the child loop.
+                # TODO : fix line 567 (see corresponding TODO)
                 processed_messages=processed_messages,
                 eta=eta,
                 last_update=last_update,
@@ -275,6 +278,7 @@ class CategorizerEngine:
             else:
                 if first_message:
                     abort = post_status_after_message(
+                        total_messages=len(nonempty_uncategorized),
                         api_endpoint=api_endpoint,
                         processed_messages=0,  # No messages processed yet
                         current_message_id=message_id,
@@ -565,6 +569,10 @@ class CategorizerEngine:
             f"Initial job information retrieved: {total_nonempty_uncategorized} messages to process. Posting..."  # noqa: E501
         )
         self.post_progress(total_messages=total_nonempty_uncategorized, status=JobStatus.RUNNING)
+        # TODO : as a temporary fix : we post total messages from the child loop.
+        # ISSUE : formula on line 567 is too conservative and yields zero due to duplicate
+        # lines in the metafile database.
+        # TODO : deduplicate and fix the metafile database
 
         # Close parent-side queriers to avoid keeping large resources alive
         try:

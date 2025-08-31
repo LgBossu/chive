@@ -31,3 +31,20 @@
 # Benefit:
 #   - First results visible to client much sooner
 #   - Reduced memory footprint for large conversations
+
+
+# TODO: The current logic for estimating uncategorized messages in the parent process
+# (total_nonempty_uncategorized = max(0, total_nonempty - already_tagged_count))
+# is too conservative when the metafile database contains duplicate or stale entries.
+# This can result in total_nonempty_uncategorized being zero or negative, causing the frontend
+# to display 'N/A' for total messages.
+#
+# Action required:
+# - Implement a deduplication routine for the metafile database to ensure only unique, valid
+#   tagged message IDs are counted.
+# - Consider updating the parent logic to use a more robust estimate, or rely on the child
+#   process to post the actual count of uncategorized messages after streaming and filtering.
+# - Audit the metafile database periodically to remove duplicates and stale entries.
+#
+# Until this is fixed, the child process should post its own estimate of uncategorized messages
+# for accurate frontend display.
