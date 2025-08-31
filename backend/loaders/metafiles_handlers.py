@@ -44,23 +44,20 @@ class Linker(ABC):
         assert self.past_db_path.exists(), f"Past database path {self.past_db_path} does not exist."
 
     @abstractmethod
-    def get_taglist(self) -> np.ndarray:
+    def get_taglist(self) -> List[Tuple[str, str]]:
         """
-        Return the taglist as a numpy array.
-
-        On the first coordinate, the message ID.
-        On the second coordinate, the tag list.
+        Return the taglist as a list of tuples (message_id, tag).
         """
         pass
 
-    def get_past_messages(self) -> Tuple[np.ndarray, np.ndarray]:
+    def get_past_messages(self) -> Tuple[List[Tuple[str, str]], List[str]]:
         """
         Return messages from the past database.
 
-        :return: A tuple of two numpy arrays:
-            - The first array contains past messages (raw text).
-            - The second array contains empty messages (if any).
-        :rtype: Tuple[np.ndarray, np.ndarray]
+        :return: A tuple of two lists:
+            - The first list contains past messages (raw text).
+            - The second list contains empty messages (if any).
+        :rtype: Tuple[List[str], List[str]]
         :raises ValueError: If no past messages are found in the database.
         """
         # TODO : refactor to bypass empty message querying,
@@ -68,17 +65,22 @@ class Linker(ABC):
         logger.debug("Connecting to the past database")
         client = chromadb.PersistentClient(path=str(self.past_db_path))
 
-        logger.debug("Fetching past messages from the database")
+        logger.debug("Fetching past messages from the database (streaming)")
         past_querier = ChromaQuerier(client)
-        past_messages = past_querier.get_all_nonempty_messages()
-        past_empty_messages = past_querier.get_all_empty_messages()
+
+        past_messages: List[Tuple[str, str]] = []
+        past_empty_messages: List[str] = []
+        for mess_id, doc in past_querier.get_all_nonempty_messages():
+            past_messages.append((str(mess_id), str(doc)))
+        for mess_id in past_querier.get_all_empty_messages():
+            past_empty_messages.append(str(mess_id))
 
         logger.debug(f"Fetched {len(past_messages)} past messages")
         if len(past_messages) == 0:
             logger.error("No past messages found in the database.")
             raise ValueError("No past messages found in the database.")
 
-        return np.array(past_messages, dtype=str), np.array(past_empty_messages, dtype=str)
+        return past_messages, past_empty_messages
 
     @abstractmethod
     def link_past_to_tags(self) -> Dict[str, List[str]]:
@@ -91,32 +93,36 @@ class Linker(ABC):
         """
         pass
 
-    def get_current_messages(self) -> Tuple[np.ndarray, np.ndarray]:
+    def get_current_messages(self) -> Tuple[List[Tuple[str, str]], List[str]]:
         """
         Get current messages from the database.
 
         This method retrieves all messages from the current database, which is expected to be
         a ChromaDB collection.
 
-        :return: A 2D numpy array with message IDs and content.
-        :rtype: np.ndarray
+        :return: A tuple of two lists:
+            - The first list contains tuples of message IDs and content.
+            - The second list contains empty messages (if any).
+        :rtype: Tuple[List[Tuple[str, str]], List[str]]
         """
         logger.debug("Connecting to the current database")
         current_querier = ChromaQuerier()
 
-        logger.debug("Fetching current messages from the database")
-        current_nonempty_messages = current_querier.get_all_nonempty_messages()
-        current_empty_messages = current_querier.get_all_empty_messages()
+        logger.debug("Fetching current messages from the database (streaming)")
+        current_nonempty_messages = []
+        current_empty_messages = []
+        for mess_id, doc in current_querier.get_all_nonempty_messages():
+            current_nonempty_messages.append((str(mess_id), str(doc)))
+        for mess_id in current_querier.get_all_empty_messages():
+            current_empty_messages.append(str(mess_id))
+
         logger.debug(f"Fetched {len(current_nonempty_messages)} current non-empty messages")
         logger.debug(f"Fetched {len(current_empty_messages)} current empty messages")
         if len(current_nonempty_messages) == 0:
             logger.error("No current messages found in the database.")
             raise ValueError("No current messages found in the database.")
 
-        return (
-            np.array(current_nonempty_messages, dtype=str),
-            np.array(current_empty_messages, dtype=str),
-        )
+        return current_nonempty_messages, current_empty_messages
 
     def link_current_to_tags(self, message_to_tags: Dict[str, List[str]]) -> Dict[str, List[str]]:
         """
@@ -223,7 +229,7 @@ class LegacyLinker(Linker):
             self.legacy_metafiles_path[0].exists() and self.legacy_metafiles_path[1].exists()
         ), f"Legacy metafiles paths {self.legacy_metafiles_path} do not exist."
 
-    def get_taglist(self) -> np.ndarray:
+    def get_taglist(self) -> List[Tuple[str, str]]:
         """
         Return the legacy taglist from metafiles as a numpy array.
 
@@ -251,7 +257,7 @@ class LegacyLinker(Linker):
 
         return np.array(legacy_taglist, dtype=str)
 
-    def get_past_messages(self) -> Tuple[np.ndarray, np.ndarray]:
+    def get_past_messages(self) -> Tuple[List[Tuple[str, str]], List[str]]:
         """
         Legacy override for previous databases that did not include an empty_messages metadata flag.
         """
@@ -515,6 +521,16 @@ class MetafileQuerier:
             ).fetchall()
         ]
         return tagged_ids
+
+    def get_all_tagged_count(self) -> int:
+        """
+        Return the count of tagged message IDs in the dynamic_tags database
+        without fetching all rows.
+
+        This is a low-memory operation compared to `get_all_tagged_ids`.
+        """
+        row = self.sqlite_cursor.execute("""SELECT COUNT(*) FROM dynamic_tags;""").fetchone()
+        return int(row[0]) if row is not None else 0
 
     def close_dynamic_tags_db(self) -> None:
         """

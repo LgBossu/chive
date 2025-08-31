@@ -1,4 +1,5 @@
 import re
+import resource
 import signal
 from multiprocessing import Process, get_start_method, set_start_method
 from pathlib import Path
@@ -155,13 +156,26 @@ class CategorizerEngine:
             seconds = int(seconds)
             return f"{int(hours)}h {int(minutes)}m {seconds}s {int(milliseconds)}ms"
 
+        # Simple memory snapshot helper (reports ru_maxrss in kilobytes on Linux)
+        def mem_snapshot(label: str) -> None:
+            try:
+                usage_kb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+                logger.info(f"[MEM] {label}: ru_maxrss={usage_kb} KB")
+            except Exception as e:
+                logger.debug(f"Failed to take memory snapshot: {e}")
+
         # Instantiate the categorizer and latent models within the subprocess
+        mem_snapshot("before model instantiation")
         categorizer_model: CategorizerModel = categorizer_model_type()
+        mem_snapshot("after model instantiation")
 
         # Instantiate queriers and metafile writer
         metafile_writer: MetafileWriter = MetafileWriter()
+        mem_snapshot("after metafile writer init")
         metafile_querier: MetafileQuerier = MetafileQuerier()
+        mem_snapshot("after metafile querier init")
         chroma_querier: ChromaQuerier = ChromaQuerier()
+        mem_snapshot("after chroma querier init")
 
         # Get the tagged list
         logger.debug("Retrieving tagged list from metafile")
@@ -169,20 +183,48 @@ class CategorizerEngine:
         logger.info(f"Already tagged messages: {len(already_tagged_messages)}")
         logger.debug(f"Already tagged messages: {list(already_tagged_messages)[:10]}...")
 
-        # Get the messages to categorize
-        logger.debug("Retrieving messages to categorize")
-        nonempty_array = chroma_querier.get_all_nonempty_messages()
-        nonempty_uncategorized = [
-            (message_id, message_content)
-            for message_id, message_content in nonempty_array
-            if message_id not in already_tagged_messages
-        ]
-        logger.info(
-            f"Found {len(nonempty_uncategorized)} uncategorized non-empty messages to process"
+        # Get the messages to categorize (streaming to avoid high-memory allocations)
+        logger.debug("Retrieving messages to categorize (streaming)")
+        mem_snapshot("after chroma querier init (streaming not started)")
+
+        # Build a small set of already tagged message IDs for quick membership checks
+        # already_tagged_messages is already a set
+
+        # Stream non-empty messages and collect uncategorized ones into a lightweight list
+        nonempty_uncategorized = []
+        nonempty_count = 0
+        for message_id, message_content in chroma_querier.get_all_nonempty_messages():
+            nonempty_count += 1
+            if message_id in already_tagged_messages:
+                continue
+            nonempty_uncategorized.append((message_id, message_content))
+
+        mem_snapshot(
+            f"after streaming nonempty messages (seen={nonempty_count}, "
+            f"uncategorized={len(nonempty_uncategorized)})"
         )
-        empty_array = chroma_querier.get_all_empty_messages()
-        empty_uncategorized = list(set(list(empty_array)) - set(already_tagged_messages))
-        logger.info(f"Found {len(empty_uncategorized)} uncategorized empty messages to process")
+        logger.info(
+            "Found %d uncategorized non-empty messages to process (out of %d)"
+            % (len(nonempty_uncategorized), nonempty_count)
+        )
+
+        # Stream empty messages ids and compute uncategorized empty ids
+        empty_uncategorized = []
+        empty_count = 0
+        for mid in chroma_querier.get_all_empty_messages():
+            empty_count += 1
+            if mid in already_tagged_messages:
+                continue
+            empty_uncategorized.append(mid)
+
+        mem_snapshot(
+            f"after streaming empty messages (seen={empty_count}, "
+            f"uncategorized={len(empty_uncategorized)})"
+        )
+        logger.info(
+            "Found %d uncategorized empty messages to process (out of %d)"
+            % (len(empty_uncategorized), empty_count)
+        )
 
         # Categorize empty messages as EMPTY_TAG
         if empty_uncategorized:
@@ -331,7 +373,7 @@ class CategorizerEngine:
         self,
         api_endpoint: str,
         override_categorizer_model: Optional[type[CategorizerModel]] = None,
-        stalling_timeout: int = 45,
+        stalling_timeout: int = 60,
         LOG_FILE: Optional[Path] = None,
         CONSOLE_LOG_LEVEL: Optional[str] = "DEBUG",
     ) -> None:
@@ -498,10 +540,28 @@ class CategorizerEngine:
     def run_categorization(self) -> None:
         # Get initial job information
         logger.info("Retrieving initial job information")
-        already_tagged_messages = set(MetafileQuerier().get_all_tagged_ids())
-        nonempty_array = ChromaQuerier().get_all_nonempty_messages()
-        total_nonempty_uncategorized = len(set(nonempty_array[:, 0]) - already_tagged_messages)
+        # TODO : check that logic here is well preserved. Approximate data is okay though.
+        # Use low-memory counts in the parent: avoid fetching full message arrays
+        metafile_querier = MetafileQuerier()
+        already_tagged_count = metafile_querier.get_all_tagged_count()
+        # For total nonempty uncategorized we use counts from ChromaQuerier
+        # without fetching documents
+        chroma_querier = ChromaQuerier()
+        total_nonempty = chroma_querier.get_all_nonempty_count()
+        # We don't know exact overlap without fetching ids; conservatively approximate
+        # to display progress: total_nonempty_uncategorized = total_nonempty - already_tagged_count
+        total_nonempty_uncategorized = max(0, total_nonempty - already_tagged_count)
         self.post_progress(total_messages=total_nonempty_uncategorized, status=JobStatus.RUNNING)
+
+        # Close parent-side queriers to avoid keeping large resources alive
+        try:
+            del metafile_querier
+        except Exception as e:
+            logger.error(f"Failed to delete metafile querier: {e}")
+        try:
+            del chroma_querier
+        except Exception as e:
+            logger.error(f"Failed to delete chroma querier: {e}")
 
         logger.info("Setting up persistent categorization")
         finished = False
