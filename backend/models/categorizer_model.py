@@ -288,6 +288,7 @@ class CategorizerModel(ABC):
 
         The method should be overridden in subclasses to ensure proper cleanup of the cache.
         """
+        logger.info(f"Deleting CategorizerModel instance {self.__repr__()}.")
         logger.debug("Cleaning up the categorizer model and tokenizer.")
         del self.tokenizer
         del self.model

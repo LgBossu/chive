@@ -2,13 +2,14 @@
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple, Union
+from typing import Dict, Generator, List, Optional, Set, Tuple, Union
 
 import chromadb
 import chromadb.api
 import chromadb.api.configuration
 import chromadb.api.types
-import numpy as np
+
+# numpy removed: avoid building large arrays in-memory from Chroma queries
 import requests
 from loguru import logger
 
@@ -279,6 +280,26 @@ class ChromaQuerier:
         self.conv_collection = self.client.get_collection(self.conv_collection_name)
         self.mess_collection = self.client.get_collection(self.mess_collection_name)
 
+    def close(self) -> None:
+        """Attempt to close or cleanup the underlying client if supported."""
+        if self.client is None:
+            pass
+        else:
+            # Linter and intellisense help
+            assert isinstance(self.client, chromadb.api.ClientAPI)
+            # Current version does not seem to have a close or shutdown method
+            del self.client
+            self.client = None
+        return None
+
+    def __del__(self):
+        # TODO : check that this destructor is sufficient
+        logger.info(f"Deleting ChromaQuerier instance {self.__repr__()}.")
+        try:
+            self.close()
+        except Exception as e:
+            logger.error(f"Failed to close ChromaQuerier associated client: {e}")
+
     def _fully_query(
         self,
         query: QueryDatabaseModel,
@@ -508,36 +529,35 @@ class ChromaQuerier:
         res = self._cast_query_res_to_message_nodes(query_res)
         return res
 
-    def get_all_nonempty_messages(self) -> np.ndarray:
+    def get_all_nonempty_messages(self) -> Generator[Tuple[str, str], None, None]:
         """
-        Retrieve all messages from the ChromaDB messages collection.
+        Lazily iterate over all non-empty messages in the collection.
+
+        Yields tuples of (message_id, document_text). This avoids building
+        large numpy arrays in memory. Consumers should iterate over the
+        generator and process items incrementally.
 
         This method filters out empty or non-text messages by checking the `empty_or_non_text`
         metadata field.
-        It returns a 2D numpy array where the first column contains message IDs
-        and the second column contains the corresponding message content.
 
-        :return: A 2D numpy array with message IDs and content.
-
-                 - On the first coordinate, the message ID.
-                 - On the second coordinate, the message content.
-
-        :rtype: np.ndarray
         :raises ValueError: If no documents are retrieved or if there is a mismatch
             between the number of IDs and documents retrieved from the messages collection.
         """
         logger.debug("Retrieving all messages from the ChromaDB messages collection.")
+        # Some chroma versions return all results in a single batch via get()
+        # We use get(include=[documents]) and expect either a flat list of ids/documents
+        # or a batched structure. Handle both cases and yield pairs.
         query_res = self.mess_collection.get(
             where={"empty_or_non_text": False},
             include=[ChromaInclude.documents],
         )
 
-        ids_list = query_res["ids"]
-        documents_list = query_res["documents"]
-        if documents_list is None:
+        ids = query_res["ids"]
+        documents = query_res["documents"]
+        if documents is None:
             logger.critical("No documents retrieved from messages collection.")
             raise ValueError("No documents retrieved from messages collection.")
-        if len(ids_list) != len(documents_list):
+        if len(ids) != len(documents):
             logger.critical(
                 "Mismatch between number of IDs and documents retrieved from messages collection."
             )
@@ -545,36 +565,68 @@ class ChromaQuerier:
                 "Mismatch between number of IDs and documents retrieved from messages collection."
             )
 
-        logger.debug(f"Retrieved {len(ids_list)} messages from the collection.")
+        logger.debug(f"Retrieved {len(ids)} messages from the collection.")
 
-        # Create a 2D numpy array with IDs and documents
-        ids_arr = np.array(ids_list, dtype=str)
-        documents_arr = np.array(documents_list, dtype=str)
-        messages_array = np.column_stack((ids_arr, documents_arr))
+        # If batch-style (lists of lists), flatten by batch
+        if ids and isinstance(ids[0], list):
+            for batch_idx in range(len(ids)):
+                batch_ids = ids[batch_idx]
+                batch_docs = documents[batch_idx]
+                for i, doc in enumerate(batch_docs):
+                    yield (str(batch_ids[i]), str(doc))
+        else:
+            for i, doc in enumerate(documents):
+                yield (str(ids[i]), str(doc))
 
-        return messages_array
-
-    def get_all_empty_messages(self) -> np.ndarray:
+    def get_all_empty_messages(self) -> Generator[str, None, None]:
         """
-        Retrieve all empty messages from the ChromaDB messages collection.
+        Lazily iterate over all empty message ids in the collection.
+
+        Yields message_id strings.
 
         This method filters messages that are marked as empty or non-text content
         by checking the `empty_or_non_text` metadata field.
         It returns a 1D numpy array containing the IDs of the empty messages.
-
-        :return: A 1D numpy array with message IDs of empty messages.
-        :rtype: np.ndarray
         """
         logger.debug("Retrieving all empty messages from the ChromaDB messages collection.")
+
         query_res = self.mess_collection.get(
             where={"empty_or_non_text": True},
             include=[],
         )
 
-        ids_list = query_res["ids"]
-        logger.debug(f"Retrieved {len(ids_list)} empty messages from the collection.")
+        ids = query_res["ids"]
+        # If batched, flatten
+        if ids and isinstance(ids[0], list):
+            for batch in ids:
+                for mid in batch:
+                    yield str(mid)
+        else:
+            for mid in ids:
+                yield str(mid)
+        logger.debug(f"Retrieved {len(ids)} empty messages from the collection.")
 
-        return np.array(ids_list, dtype=str)
+    def get_all_nonempty_count(self) -> int:
+        """Return the count of non-empty messages without storing all documents.
+
+        :return: The count of non-empty messages
+        :rtype: int"""
+        query_res = self.mess_collection.get(where={"empty_or_non_text": False}, include=[])
+        ids = query_res.get("ids") or []
+        if ids and isinstance(ids[0], list):
+            return sum(len(batch) for batch in ids)
+        return len(ids)
+
+    def get_all_empty_count(self) -> int:
+        """Return the count of empty messages without storing all documents.
+
+        :return: The count of empty messages
+        :rtype: int"""
+        query_res = self.mess_collection.get(where={"empty_or_non_text": True}, include=[])
+        ids = query_res.get("ids") or []
+        if ids and isinstance(ids[0], list):
+            return sum(len(batch) for batch in ids)
+        return len(ids)
 
     def get_conversation_title(self, conversation_id: str) -> str:
         """
