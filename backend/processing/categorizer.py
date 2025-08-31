@@ -1,3 +1,4 @@
+import gc
 import re
 import resource
 import signal
@@ -24,6 +25,62 @@ from backend.utils.log_setup import LoggerSetup
 # to avoid memory issues when and if the project scales up.
 
 # TODO : factorize this module to separate logic and utils from runtime.
+
+# TODO / REFACTOR PLAN — categorizer.py
+#
+# Goal:
+# - Full, staged refactor of this module to eliminate memory growth, improve observability,
+#   and make the child-process categorization loop stream-safe and testable.
+#
+# High-priority action items:
+# 1) Child-loop memory audit
+#    - Inspect and instrument the child loop to ensure it never holds whole collections of messages.
+#    - Use streaming/iterators for any DB reads; remove any accumulation of full documents.
+#    - Add per-message GC checkpoints only if necessary and measurable.
+#
+# 2) Heavy imports / lazy loading
+#    - Move heavyweight imports (Torch, large ML libs, big loaders) inside the subprocess entry
+#      so the parent process does not inherit native allocator arenas.
+#
+# 3) Explicit resource lifecycle
+#    - Add `.close()` / `.shutdown()` on MetafileQuerier, ChromaQuerier, MetafileWriter, etc.
+#    - Ensure parent always calls these after each subprocess cycle; child must close before exit.
+#
+# 4) Progress & counting correctness
+#    - Fix metafile DB duplicates (dedupe script + migration).
+#    - Replace conservative count formula with an efficient overlap-check or streaming sampling.
+#
+# 5) Diagnostics & monitoring
+#    - Add psutil-based parent snapshots (RSS, num_fds) per cycle and tracemalloc in short runs.
+#    - Keep the mem_snapshot logs in both parent and child; enable toggled verbose diagnostics.
+#    - Record metrics to a lightweight log file for long runs (timestamp + RSS + fd count + cycle id).  # noqa: E501
+#
+# 6) Tests & smoke harness
+#    - Create a small harness that spawns the child N times and asserts stable RSS and no fd growth.
+#    - Add unit tests for writer/querier close semantics and dedupe logic.
+#
+# 7) Safety & resiliency
+#    - Ensure subprocesses are always joined and reaped (no zombies).
+#    - On forced kill, join/close parent-side Process object and run gc.collect().
+#    - Harden blacklisting / collision handling (atomic DB ops if possible).
+#
+# 8) Staged migration plan
+#    - Phase 0: Add monitoring, explicit closes, and lazy imports (minimal risk).
+#    - Phase 1: Add dedupe utility and fix progress counting (requires DB migration).
+#    - Phase 2: Refactor child loop to pull-only-streaming API and smaller memory footprint.
+#    - Phase 3: Add thorough tests, run long stress loop, and iterate on native memory issues.
+#
+# Acceptance criteria (before declaring refactor done):
+# - Repeated subprocess cycles (N >= 50) show no >5% sustained RSS increase in parent.
+# - No file descriptor growth across cycles.
+# - Progress reporting is accurate (no N/A due to dupes) after dedupe migration.
+# - Unit and smoke tests cover major resource paths and pass in CI.
+#
+# Notes:
+# - Prioritize moving heavy imports into the child first; this buys the most immediate reduction in parent RSS.  # noqa: E501
+# - Use small, reversible changes with metrics so each step shows measurable improvement.
+#
+# End TODO
 
 NO_STALLING_ID = "[NotAnId]"
 
@@ -629,7 +686,46 @@ class CategorizerEngine:
                             f"Subprocess {subprocess.pid} is still alive after termination. Force killing."  # noqa: E501
                         )
                         subprocess.kill()
-                    break
+                        try:
+                            subprocess.join(timeout=5)
+                        except Exception:
+                            # Best-effort join after killing; proceed with cleanup anyway
+                            pass
+
+                    # Parent-side cleanup: try to release resources held by the Process object
+                    try:
+                        # Ensure any child-related resources are reclaimed by Python
+                        gc.collect()
+                    except Exception:
+                        logger.debug("Parent GC collecteion failed or raised an exception.")
+
+                    try:
+                        # Close the underlying FD/resources of the Process object (Python 3.8+)
+                        if hasattr(subprocess, "close"):
+                            subprocess.close()
+                    except Exception as e:
+                        logger.debug(f"Failed to close subprocess resources: {e}")
+
+                    # Log a parent memory snapshot to help detect gradual growth
+                    try:
+                        usage_kb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+                        if usage_kb > 1_000:
+                            usage_mb = usage_kb / 1024
+                            if usage_mb > 1_000:
+                                usage_gb = usage_mb / 1024
+                                logger.info(
+                                    f"[PARENT MEM] after subprocess: ru_maxrss={usage_gb:.3f} GB"
+                                )
+                            else:
+                                logger.info(
+                                    f"[PARENT MEM] after subprocess: ru_maxrss={usage_mb:.3f} MB"
+                                )
+                        else:
+                            logger.info(f"[PARENT MEM] after subprocess: ru_maxrss={usage_kb} KB")
+                    except Exception as e:
+                        logger.debug(f"Failed to take parent memory snapshot: {e}")
+
+                    break  # Break the inner loop to restart the subprocess
 
             logger.info("Subprocess terminated. Checking exit code.")
             if subprocess.exitcode == 0:
