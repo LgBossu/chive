@@ -161,6 +161,7 @@ class MessageNode:
 
     # def __del__(self) -> None:
     #     """Deletes GC-wise."""
+    # TODO : check use of the above commented destructor
 
     def delete(self) -> None:
         """Deletes the message node from the tree,

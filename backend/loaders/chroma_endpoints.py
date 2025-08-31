@@ -294,10 +294,11 @@ class ChromaQuerier:
 
     def __del__(self):
         # TODO : check that this destructor is sufficient
+        logger.info(f"Deleting ChromaQuerier instance {self.__repr__()}.")
         try:
             self.close()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error(f"Failed to close ChromaQuerier associated client: {e}")
 
     def _fully_query(
         self,
