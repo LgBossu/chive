@@ -1,5 +1,6 @@
 import re
 import signal
+import sys
 from multiprocessing import Process, get_start_method, set_start_method
 from pathlib import Path
 from time import sleep, time
@@ -18,6 +19,7 @@ from backend.loaders.metafiles_handlers import (
 from backend.models.app_models import CategorizerJobInfo, JobStatus
 from backend.models.categorizer_model import Categorizer0, CategorizerModel
 from backend.utils.log_setup import LoggerSetup
+
 
 # TODO : maybe shard the databases and categorization process
 # to avoid memory issues when and if the project scales up.
@@ -94,7 +96,6 @@ class CategorizerEngine:
 
         # Define post utility
         from requests import ConnectionError, HTTPError, post
-
         from backend.models.app_models import CategorizerJobInfo, JobStatus
 
         def post_status_after_message(
@@ -382,6 +383,65 @@ class CategorizerEngine:
             )  # Debug this issue if it occurs
         finally:
             logger.info("Subprocess start method set to 'spawn'.")
+
+    class Worker:
+        """
+        Worker class to handle subprocess catorization tasks.
+        """
+
+        class SignalHandler:
+            """
+            Handles system signals for subprocess termination.
+            """
+            @staticmethod
+            def sigterm_handler(signum, frame):
+                logger.warning("Received SIGTERM. Exiting subprocess.")
+                sys.exit(143)  # 143 = 128 + 15 (SIGTERM)
+
+            @staticmethod
+            def sigint_handler(signum, frame):
+                logger.warning("Received SIGINT. Exiting subprocess.")
+                sys.exit(130)  # 130 = 128 + 2 (SIGINT)
+
+            @staticmethod
+            def sigabrt_handler(signum, frame):
+                logger.warning("Received SIGABRT. Exiting subprocess.")
+                sys.exit(134)  # 134 = 128 + 6 (SIGABRT)
+
+            def register_signal_handlers(self):
+                signal.signal(signal.SIGTERM, self.sigterm_handler)
+                signal.signal(signal.SIGINT, self.sigint_handler)
+                signal.signal(signal.SIGABRT, self.sigabrt_handler)
+            
+            def abort_exit(self):
+                logger.info("Exiting subprocess under abort signal.")
+                sys.exit(46)  # 46 is a custom exit code for abort (leet speak "Ab = 46")
+            
+            def finished_exit(self):
+                logger.info("Exiting subprocess after successful completion.")
+                sys.exit(0)
+
+            def __init__(self) -> None:
+                self.register_signal_handlers()
+
+
+        def __init__(self,
+                     LOG_FILE: Path,
+                    #  logger_setup: LoggerSetup,
+                     categorizer_model: type[CategorizerModel],
+                     api_endpoint: Optional[str] = None,
+            ):
+            # TODO : does the worker need a reference to the parent class ?
+            # Set up exit codes
+            LoggerSetup.configure_logger(
+                force_log_file=LOG_FILE,
+            )
+            self.categorizer_model = categorizer_model
+            self.api_endpoint = api_endpoint
+
+            self.signal_handler = self.SignalHandler()
+
+
 
     @property
     def log_line_regex(self):
