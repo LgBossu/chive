@@ -498,6 +498,24 @@ class CategorizerEngine:
             self.categorizer_model_type = categorizer_model_type
             self.api_endpoint = api_endpoint     
 
+        def set_helpers(self):
+            self.signal_handler = self.SignalHandler()
+            
+            if self.api_endpoint is not None:
+                self.api_messenger = self.APIMessenger(api_endpoint=self.api_endpoint)
+            else:
+                self.api_messenger = None
+                logger.warning(
+                    "No API endpoint provided for job status updates. "
+                    "Job progress will not be posted."
+                )
+
+            self.categorizer_model: CategorizerModel = self.categorizer_model_type()
+
+            self.metafile_writer: MetafileWriter = MetafileWriter()
+            self.metafile_querier: MetafileQuerier = MetafileQuerier()
+            self.chroma_querier: ChromaQuerier = ChromaQuerier()
+
 
 
     @property
