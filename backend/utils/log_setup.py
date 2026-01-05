@@ -8,6 +8,11 @@ from backend.utils.path_utils import get_paths
 
 
 class LoggerSetup:
+    """
+    A utility class to set up logging for the application using loguru.
+    This class provides a static method `configure_logger` to configure logging to both the console
+    and a log file.
+    """
     # Retrieve the log file path once to be reused.
 
     @staticmethod
@@ -18,6 +23,13 @@ class LoggerSetup:
         """
         Set up loguru logger with a console and a file sink.
         This should be called once in the application's lifetime.
+
+        Args:
+            console_level (Optional[str]): The logging level for console output. 
+                                           Defaults to "INFO" if not provided or invalid.
+                                           Options are: "TRACE", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL".
+            force_log_file (Optional[Path]): An optional path to force the log file location. 
+                                             If not provided, the default application log file path is used.
         """
         if force_log_file is not None:
             LOG_FILE = force_log_file
