@@ -424,11 +424,70 @@ class CategorizerEngine:
             def __init__(self) -> None:
                 self.register_signal_handlers()
 
+        class APIMessenger:
+            """
+            Handles API communication for job status updates.
+            """
+            def __init__(self, api_endpoint: str) -> None:
+                self.api_endpoint = api_endpoint
+                self.last_update: Union[float, None] = None
+
+            def post_status_after_message(
+                self,
+                eta: Optional[str] = None,
+                current_message_id: Optional[str] = None,
+                current_speed: Optional[float] = None,
+                # last_update: Optional[float] = None,
+                processed_messages: int = 1,  # Increment processed messages by 1
+            ) -> bool:
+                # TODO : add abort logic to the subprocess
+                # TODO : refactor the code below to use the API after every finished message.
+                # This will allow to update the job status and progress in real-time,
+                if self.last_update is None:
+                    self.last_update = time()
+
+                job_info = CategorizerJobInfo(
+                    status=JobStatus.RUNNING,
+                    total_messages=None,  # This was sent at the beginning of the job
+                    processed_messages=processed_messages,
+                    eta=eta,
+                    last_update=self.last_update,
+                    current_message_id=current_message_id,
+                    current_speed=current_speed,
+                )
+                try:
+                    response = post(self.api_endpoint, json=job_info.model_dump())
+                    abort_signal = response.json()["command"]
+                    return abort_signal == "##ABORT##"  # TODO : do NOT hardcode
+                except HTTPError as e:
+                    logger.error(f"Failed to post job progress: {e}")
+                    logger.warning("The job cannot be aborted through the API. Be advised.")
+                except ConnectionError as e:
+                    logger.error(
+                        f"Failed to connect to the job progress endpoint: {e}. Is the server running?"
+                    )
+                    logger.warning("The job cannot be aborted through the API. Be advised.")
+
+                return False  # Do not abort the job if the connection fails
+            
+            def display_time(self, seconds: float, tz: int = 1, duration: bool = False) -> str:
+                if not duration:
+                    _, seconds = divmod(seconds, 86400)
+                    hours, seconds = divmod(seconds, 3600)
+                    hours = (hours + tz) % 24  # We are dealing with a date and account for timezone
+                else:
+                    hours, seconds = divmod(seconds, 3600)
+
+                minutes, seconds = divmod(seconds, 60)
+                milliseconds = (seconds - int(seconds)) * 1000
+                seconds = int(seconds)
+
+                return f"{int(hours)}h {int(minutes)}m {seconds}s {int(milliseconds)}ms"
 
         def __init__(self,
                      LOG_FILE: Path,
                     #  logger_setup: LoggerSetup,
-                     categorizer_model: type[CategorizerModel],
+                     categorizer_model_type: type[CategorizerModel],
                      api_endpoint: Optional[str] = None,
             ):
             # TODO : does the worker need a reference to the parent class ?
@@ -436,10 +495,8 @@ class CategorizerEngine:
             LoggerSetup.configure_logger(
                 force_log_file=LOG_FILE,
             )
-            self.categorizer_model = categorizer_model
-            self.api_endpoint = api_endpoint
-
-            self.signal_handler = self.SignalHandler()
+            self.categorizer_model_type = categorizer_model_type
+            self.api_endpoint = api_endpoint     
 
 
 
