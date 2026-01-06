@@ -365,9 +365,8 @@ class CategorizerEngine:
         # Set the metafile writer and querier
         self.metafile_writer_type = MetafileWriter
         self.metafile_querier_type = MetafileQuerier
-
         # Set the chroma querier
-        self.chroma_querier = ChromaQuerier
+        self.chroma_querier_type = ChromaQuerier
 
         # Set the stalling timeout
         self.stalling_timeout = stalling_timeout
@@ -392,7 +391,7 @@ class CategorizerEngine:
         """
         Worker class to handle subprocess catorization tasks.
         """
-
+        # TODO : add destructors to all helper classes, and Worker
         class SignalHandler:
             """
             Handles system signals for subprocess termination.
