@@ -622,6 +622,43 @@ class ChromaQuerier:
         }
         logger.debug(f"Document counts: {counts}")
         return counts
+    
+    def stream_messages(
+            self,
+            batch_size: int = 5000,
+            include_content: bool = False,
+            include_metadata: bool = False,
+        ) -> Iterable[chromadb.api.types.GetResult]:
+        """
+        Stream messages from the ChromaDB messages collection in batches.
+
+        :param batch_size: The number of messages to retrieve in each batch (default is 5000)
+        :param include_content: Whether to include message content in the output (default is False)
+        :param include_metadata: Whether to include metadata in the output (default is False)
+        :return: An iterable of dictionaries containing message IDs,
+                 and optionally content and metadata.
+        """
+        include_fields = []
+        if include_content:
+            include_fields.append(ChromaInclude.documents)
+        if include_metadata:
+            include_fields.append(ChromaInclude.metadatas)
+
+        offset = 0
+        while True:
+            query_res: chromadb.GetResult = self.mess_collection.get(
+                limit=batch_size,
+                offset=offset,
+                include=include_fields,
+            )
+            
+            offset += batch_size
+            yield query_res
+
+            if len(query_res["ids"]) < batch_size:
+                # Reached the end of the collection
+                break
+
 
 
 class ChromaCreator:
