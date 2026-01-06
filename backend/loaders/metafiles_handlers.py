@@ -11,6 +11,13 @@ from loguru import logger
 from backend.loaders.chroma_endpoints import ChromaQuerier
 from backend.utils.path_utils import get_paths
 
+# TODO // # WARNING :
+# dynamic_tags is an FTS5 table used as a presence index (message_id → tags).
+# This is convenient but not ideal: FTS5 is not optimized for key-based joins.
+# Current TEMP-table JOIN logic works but may be suboptimal.
+# Revisit only after streaming/batching and OOM issues are fully resolved.
+
+
 # TODO : deeply analyze this module for potential memory leaks on linking operations.
 # Up to estimated 8GB of RAM usage is measured on system monitor :
 # Verify if this is due to module level manipulation, design issues, or other factors.
