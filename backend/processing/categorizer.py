@@ -445,6 +445,10 @@ class CategorizerEngine:
                 first_uncategorized_offset = first_uncategorized_offset,
             )
 
+        def __del__(self) -> None:
+            del self.metafile_querier
+            del self.chroma_querier
+
 
 
     class Supervisor:
