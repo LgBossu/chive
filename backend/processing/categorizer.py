@@ -166,7 +166,7 @@ class CategorizerEngine:
 
         # Get the tagged list
         logger.debug("Retrieving tagged list from metafile")
-        already_tagged_messages = set(metafile_querier.get_all_tagged_ids())
+        already_tagged_messages = set(metafile_querier.get_all_tagged_ids()) # Horrifying
         logger.info(f"Already tagged messages: {len(already_tagged_messages)}")
         logger.debug(f"Already tagged messages: {list(already_tagged_messages)[:10]}...")
 
@@ -499,8 +499,8 @@ class CategorizerEngine:
             LoggerSetup.configure_logger(
                 force_log_file=LOG_FILE,
             )
-            self.categorizer_model_type = categorizer_model_type
-            self.api_endpoint = api_endpoint     
+            self.categorizer_model_type: type[CategorizerModel] = categorizer_model_type
+            self.api_endpoint: Optional[str] = api_endpoint     
 
         def set_helpers(self):
             self.signal_handler = self.SignalHandler()
