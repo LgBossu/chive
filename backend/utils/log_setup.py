@@ -31,6 +31,7 @@ class LoggerSetup:
             force_log_file (Optional[Path]): An optional path to force the log file location. 
                                              If not provided, the default application log file path is used.
         """
+        # TODO : check when and how it is called multiple times, and if it is legitimate or if we can pass the logsetup by reference
         if force_log_file is not None:
             LOG_FILE = force_log_file
         else:
