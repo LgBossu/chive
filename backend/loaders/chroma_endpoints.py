@@ -625,7 +625,7 @@ class ChromaQuerier:
     
     def stream_messages(
             self,
-            batch_size: int = 5000,
+            batch_size: int = 10000,
             include_content: bool = False,
             include_metadata: bool = False,
         ) -> Iterable[chromadb.api.types.GetResult]:
