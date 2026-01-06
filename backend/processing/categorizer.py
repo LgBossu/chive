@@ -4,7 +4,7 @@ import sys
 from multiprocessing import Process, get_start_method, set_start_method
 from pathlib import Path
 from time import sleep, time
-from typing import Optional, Union
+from typing import Optional, Tuple, Union
 
 from loguru import logger
 from requests import ConnectionError, HTTPError, get, post
@@ -383,9 +383,28 @@ class CategorizerEngine:
                 get_start_method() == "spawn"
             ), (
                 "The start method is not 'spawn'. Check configuration."
-            )  # Debug this issue if it occurs
+            )  # Debug this issue if it ever occurs
         finally:
             logger.info("Subprocess start method set to 'spawn'.")
+    
+    def _set_helpers(self):
+        # Instantiate connections to the databases
+        self.metafile_writer: MetafileWriter = self.metafile_writer_type()
+        self.metafile_querier: MetafileQuerier = self.metafile_querier_type()
+        self.chroma_querier: ChromaQuerier = self.chroma_querier_type()
+
+
+    class Planner:
+        """
+        Establishes statistics, batch estimations, and other planning utilities for the categorization process.
+        """
+        pass
+
+    class Supervisor:
+        """
+        Supervises the categorization subprocess, monitoring its status and handling stalling detection.
+        """
+        pass
 
     class Worker:
         """
@@ -491,7 +510,8 @@ class CategorizerEngine:
                      LOG_FILE: Path,
                     #  logger_setup: LoggerSetup,
                      categorizer_model_type: type[CategorizerModel],
-                     api_endpoint: Optional[str] = None,
+                     connection_wrappers: Tuple[MetafileWriter, MetafileQuerier, ChromaQuerier],
+                     api_endpoint: Optional[str] = None
             ):
             # TODO : does the worker need a reference to the parent class ?
             # Set up exit codes
@@ -513,11 +533,9 @@ class CategorizerEngine:
                     "Job progress will not be posted."
                 )
 
-            self.categorizer_model: CategorizerModel = self.categorizer_model_type()
+            # DO NOT instantiate the model here, wait for the run method
+            # self.categorizer_model: CategorizerModel = self.categorizer_model_type()
 
-            self.metafile_writer: MetafileWriter = MetafileWriter()
-            self.metafile_querier: MetafileQuerier = MetafileQuerier()
-            self.chroma_querier: ChromaQuerier = ChromaQuerier()
 
 
 
