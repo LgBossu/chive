@@ -33,6 +33,7 @@ class DatabaseCounts(TypedDict):
     total_uncategorized: int
     nonempty_uncategorized: int
     empty_uncategorized: int
+    first_uncategorized_offset: Optional[int] # Let's us skip to the first uncategorized message directly
 
 def display_time(seconds: float, tz: int = 1, duration: bool = False) -> str:
     _, seconds = divmod(seconds, 86400)
@@ -413,8 +414,37 @@ class CategorizerEngine:
             Counts the number of uncategorized messages in the database.
             Returns a tuple of (total count,non-empty uncategorized count, empty uncategorized count).
             """
+            total_uncategorized = 0
+            nonempty_uncategorized = 0
+            empty_uncategorized = 0
+
+            first_uncategorized_offset: Optional[int] = None
+
             for batch in self.chroma_querier.stream_messages(include_metadata=True):
-                pass
+                assert batch["metadatas"] is not None, "Metadatas weren't fetched." # Linter enforcement
+
+                categorized_ids = set(self.metafile_querier.match_ids(batch['ids']))
+                uncategorized_ids = [msg_id for msg_id in batch['ids'] if msg_id not in categorized_ids]
+
+                if first_uncategorized_offset is None and len(uncategorized_ids) > 0:
+                    first_uncategorized_offset = batch['ids'].index(uncategorized_ids[0])
+                
+                total_uncategorized += len(uncategorized_ids)
+                for msg_idx, msg_id in enumerate(batch['ids']):
+                    if msg_id in uncategorized_ids:
+                        is_empty = batch['metadatas'][msg_idx]['empty_or_non_text']
+                        if is_empty:
+                            empty_uncategorized += 1
+                        else:
+                            nonempty_uncategorized += 1
+            
+            return DatabaseCounts(
+                total_uncategorized = total_uncategorized,
+                nonempty_uncategorized = nonempty_uncategorized,
+                empty_uncategorized = empty_uncategorized,
+                first_uncategorized_offset = first_uncategorized_offset,
+            )
+
 
 
     class Supervisor:
