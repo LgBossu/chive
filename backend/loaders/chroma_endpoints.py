@@ -538,6 +538,8 @@ class ChromaQuerier:
             logger.error(f"Error processing get result of conversation contents by ID: {e}")
             raise ValueError("Error processing get result of conversation contents by ID.") from e
 
+    # GET ALL METHODS ARE TO BE DEPRECATED
+    # TODO : DEPRECATE AND REPLACE WITH STREAMING METHODS
     def get_all_nonempty_messages(self) -> np.ndarray:
         """
         Retrieve all messages from the ChromaDB messages collection.
