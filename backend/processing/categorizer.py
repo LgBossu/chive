@@ -4,7 +4,8 @@ import sys
 from multiprocessing import Process, get_start_method, set_start_method
 from pathlib import Path
 from time import sleep, time
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple, TypedDict, Union
+
 
 from loguru import logger
 from requests import ConnectionError, HTTPError, get, post
@@ -28,6 +29,10 @@ from backend.utils.log_setup import LoggerSetup
 
 NO_STALLING_ID = "[NotAnId]"
 
+class DatabaseCounts(TypedDict):
+    total_uncategorized: int
+    nonempty_uncategorized: int
+    empty_uncategorized: int
 
 def display_time(seconds: float, tz: int = 1, duration: bool = False) -> str:
     _, seconds = divmod(seconds, 86400)
@@ -398,7 +403,19 @@ class CategorizerEngine:
         """
         Establishes statistics, batch estimations, and other planning utilities for the categorization process.
         """
-        pass
+        def __init__(self,
+                     connection_wrappers: Tuple[MetafileQuerier, ChromaQuerier],
+                    ) -> None:
+            self.metafile_querier, self.chroma_querier = connection_wrappers
+
+        def count_uncategorized_messages(self) -> DatabaseCounts:
+            """
+            Counts the number of uncategorized messages in the database.
+            Returns a tuple of (total count,non-empty uncategorized count, empty uncategorized count).
+            """
+            for batch in self.chroma_querier.stream_messages(include_metadata=True):
+                pass
+
 
     class Supervisor:
         """
