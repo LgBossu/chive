@@ -465,6 +465,8 @@ class MetafileWriter:
         """
         Destructor to ensure the database connection is closed when the object is deleted.
         """
+        # TODO : prefer deterministic closing via explicit closer method calls
+
         self.close_dynamic_tags_db()
         logger.debug(
             f"MetafileWriter instance {self.__repr__()} deleted, database connection closed"
@@ -570,6 +572,8 @@ class MetafileQuerier:
         """
         Destructor to ensure the database connection is closed when the object is deleted.
         """
+        # TODO : prefer deterministic closing via explicit closer method calls
+
         self.close_dynamic_tags_db()
         logger.debug(
             f"MetafileQuerier instance {self.__repr__()} deleted, database connection closed"

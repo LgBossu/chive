@@ -288,6 +288,8 @@ class CategorizerModel(ABC):
 
         The method should be overridden in subclasses to ensure proper cleanup of the cache.
         """
+        # TODO : prefer deterministic closing via explicit closer method calls
+
         logger.debug("Cleaning up the categorizer model and tokenizer.")
         del self.tokenizer
         del self.model
@@ -506,6 +508,8 @@ CATEGORIZATION:"""
 
         The method should be overridden in subclasses to ensure proper cleanup of the cache.
         """
+        # TODO : prefer deterministic closing via explicit closer method calls
+
         super().__del__()
         torch.xpu.empty_cache()
         logger.debug("Categorizer0 model and tokenizer cleaned up.")

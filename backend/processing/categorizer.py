@@ -446,6 +446,7 @@ class CategorizerEngine:
             )
 
         def __del__(self) -> None:
+            # TODO : deterministic `close` methods should be preferred to "destructors", in all scripts
             del self.metafile_querier
             del self.chroma_querier
 
@@ -456,12 +457,15 @@ class CategorizerEngine:
         Supervises the categorization subprocess, monitoring its status and handling stalling detection.
         """
         pass
+        # TODO : add closer method to free resources when done
 
     class Worker:
         """
         Worker class to handle subprocess catorization tasks.
         """
         # TODO : add destructors to all helper classes, and Worker
+        # TODO : add closer method to free resources when done
+
         class SignalHandler:
             """
             Handles system signals for subprocess termination.
@@ -561,7 +565,7 @@ class CategorizerEngine:
                      LOG_FILE: Path,
                     #  logger_setup: LoggerSetup,
                      categorizer_model_type: type[CategorizerModel],
-                     connection_wrappers: Tuple[MetafileWriter, MetafileQuerier, ChromaQuerier],
+                     connection_wrappers: Tuple[MetafileWriter, MetafileQuerier, ChromaQuerier], # TODO : use the wrappers in ulterior methods = set attributes !
                      api_endpoint: Optional[str] = None
             ):
             # TODO : does the worker need a reference to the parent class ?
@@ -584,8 +588,11 @@ class CategorizerEngine:
                     "Job progress will not be posted."
                 )
 
-            # DO NOT instantiate the model here, wait for the run method
+            # # DO NOT instantiate the model here, wait for the run method
             # self.categorizer_model: CategorizerModel = self.categorizer_model_type()
+        
+        # TODO : add closer method to free resources when done
+
 
 
 
