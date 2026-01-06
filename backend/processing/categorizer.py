@@ -27,6 +27,8 @@ from backend.utils.log_setup import LoggerSetup
 
 # TODO : factorize this module to separate logic and utils from runtime.
 
+# TODO : make a list and scheme somewhere of WHO owns WHAT objects, to ensure proper and consistent resource freeing
+
 NO_STALLING_ID = "[NotAnId]"
 
 class DatabaseCounts(TypedDict):
