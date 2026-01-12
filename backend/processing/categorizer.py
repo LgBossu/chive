@@ -30,6 +30,7 @@ from chromadb.api.types import GetResult
 
 # TODO : make a list and scheme somewhere of WHO owns WHAT objects, to ensure proper and consistent resource freeing
 
+
 NO_STALLING_ID = "[NotAnId]"
 
 class DatabaseCounts(TypedDict):
@@ -796,3 +797,5 @@ class CategorizerEngine:
         if not normal_end:
             logger.critical("Categorization subprocess ended abnormally. Please check the logs for details.")
         logger.info("Categorization engine shutting down.")
+        # TODO : check if any remaining resources need to be freed
+        
