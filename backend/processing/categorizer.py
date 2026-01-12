@@ -61,14 +61,126 @@ class WorkerConfig(TypedDict):
 
 
 class Worker:
-    class Subclass:
-        pass
+    class SignalHandler:
+        """
+        Handles system signals for subprocess termination.
+        """
+        @staticmethod
+        def sigterm_handler(signum, frame):
+            logger.warning("Received SIGTERM. Exiting subprocess.")
+            sys.exit(143)  # 143 = 128 + 15 (SIGTERM)
+
+        @staticmethod
+        def sigint_handler(signum, frame):
+            logger.warning("Received SIGINT. Exiting subprocess.")
+            sys.exit(130)  # 130 = 128 + 2 (SIGINT)
+
+        @staticmethod
+        def sigabrt_handler(signum, frame):
+            logger.warning("Received SIGABRT. Exiting subprocess.")
+            sys.exit(134)  # 134 = 128 + 6 (SIGABRT)
+
+        def register_signal_handlers(self):
+            signal.signal(signal.SIGTERM, self.sigterm_handler)
+            signal.signal(signal.SIGINT, self.sigint_handler)
+            signal.signal(signal.SIGABRT, self.sigabrt_handler)
+        
+        def abort_exit(self):
+            logger.info("Exiting subprocess under abort signal.")
+            sys.exit(46)  # 46 is a custom exit code for abort (leet speak "Ab = 46")
+        
+        def finished_exit(self):
+            logger.info("Exiting subprocess after successful completion.")
+            sys.exit(0)
+
+        def __init__(self) -> None:
+            self.register_signal_handlers()
+
+    class APIMessenger:
+        """
+        Handles API communication for job status updates.
+        """
+        def __init__(self, api_endpoint: str) -> None:
+            self.api_endpoint = api_endpoint
+            self.last_update: Union[float, None] = None
+
+        def post_status_after_message(
+            self,
+            eta: Optional[str] = None,
+            current_message_id: Optional[str] = None,
+            current_speed: Optional[float] = None,
+            # last_update: Optional[float] = None,
+            processed_messages: int = 1,  # Increment processed messages by 1
+        ) -> bool:
+            # TODO : add abort logic to the subprocess
+            # TODO : refactor the code below to use the API after every finished message.
+            # This will allow to update the job status and progress in real-time,
+            
+            if self.last_update is None:
+                self.last_update = time()
+
+            job_info = CategorizerJobInfo(
+                status=JobStatus.RUNNING,
+                total_messages=None,  # This was sent at the beginning of the job
+                processed_messages=processed_messages,
+                eta=eta,
+                last_update=self.last_update,
+                current_message_id=current_message_id,
+                current_speed=current_speed,
+            )
+
+            try:
+                response = post(self.api_endpoint, json=job_info.model_dump())
+                abort_signal = response.json()["command"]
+                return abort_signal == "##ABORT##"  # TODO : do NOT hardcode
+            except HTTPError as e:
+                logger.error(f"Failed to post job progress: {e}")
+                logger.warning("The job cannot be aborted through the API. Be advised.")
+            except ConnectionError as e:
+                logger.error(
+                    f"Failed to connect to the job progress endpoint: {e}. Is the server running?"
+                )
+                logger.warning("The job cannot be aborted through the API. Be advised.")
+            
+            return False  # Do not abort the job if the connection fails
+        
 
     def __init__(self, config:WorkerConfig) -> None:
-        pass
+        LoggerSetup.configure_logger(force_log_file=config["log_file"])
+        
+        self.signal_handler = self.SignalHandler()
+
+        self.api_endpoint = config["api_endpoint"]
+        self.api_messenger = self.APIMessenger(api_endpoint=self.api_endpoint)
+        
+        self.categorizer_model_type = config["categorizer_model_type"]
+        
+        self.metafile_writer_type = config["metafile_writer_type"]
+        self.metafile_querier_type = config["metafile_querier_type"]
+        self.chroma_querier_type = config["chroma_querier_type"]
+
+    def open_connections(self):
+        """Instantiate connections to the databases"""
+        self.metafile_writer: MetafileWriter = self.metafile_writer_type()
+        self.metafile_querier: MetafileQuerier = self.metafile_querier_type()
+        self.chroma_querier: ChromaQuerier = self.chroma_querier_type()
+    
+    def close_connections(self):
+        """
+        Close connections to the databases, and delete the attributes
+        (connections need to be reinstantiated to be reopened).
+        """
+        self.metafile_writer.close()
+        self.metafile_querier.close()
+        self.chroma_querier.close()
+        del self.metafile_writer
+        del self.metafile_querier
+        del self.chroma_querier
+
 
     def run(self):
         pass
+
 
 def subprocess(worker_cls: type[Worker], config: WorkerConfig):
     worker = worker_cls(config)
