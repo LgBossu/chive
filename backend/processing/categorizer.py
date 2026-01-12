@@ -588,7 +588,7 @@ class CategorizerEngine:
             # DO NOT instantiate the model here, wait for the run method
             # self.categorizer_model: CategorizerModel = self.categorizer_model_type()
 
-
+        # def run_subprocess(self):
 
 
     @property
