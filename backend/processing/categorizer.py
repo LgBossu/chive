@@ -1,4 +1,3 @@
-import re
 import signal
 import sys
 from multiprocessing import Process, get_start_method, set_start_method
@@ -346,7 +345,7 @@ class Worker:
                 start_time = time()
                 categories = self.categorizer_model_wrapper.categorize(message_id, message_content)
                 end_time = time()
-                
+
                 self.api_messenger.post_wrapper(processed_messages=0, current_message_id=None)
                 # Notify no message is being processed, do not increment processed count
 
