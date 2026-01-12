@@ -160,8 +160,12 @@ class Worker:
         def close_model(self) -> None:
             self.model.close()
 
-        def categorize(self, message_content: str) -> List[str]:
-            return self.model.categorize(message_content)
+        def categorize(self, message_id: str, message_content: str) -> List[str]:
+            try:
+                return self.model.categorize(message_content)
+            except self.model.ExceedingSafetyLimitError:
+                logger.warning(f"Message [{message_id}] exceeded safety limit. Assigning BLACKLIST_TAG.")
+                return [BLACKLIST_TAG]
 
     def __init__(self, config:WorkerConfig) -> None:
         LoggerSetup.configure_logger(force_log_file=config["log_file"])
@@ -176,6 +180,10 @@ class Worker:
         self.metafile_writer_type = config["metafile_writer_type"]
         self.metafile_querier_type = config["metafile_querier_type"]
         self.chroma_querier_type = config["chroma_querier_type"]
+
+        self.database_counts = config["database_counts"]
+
+        self.first_message: bool = True
 
     def open_connections(self):
         """Instantiate connections to the databases"""
@@ -195,9 +203,60 @@ class Worker:
         del self.metafile_querier
         del self.chroma_querier
 
+    def load_categorizer_model(self):
+        """Instantiate the categorizer model."""
+        self.categorizer_model_wrapper = self.CategorizerModelWrapper(
+            model_type=self.categorizer_model_type,
+        )
+        self.categorizer_model_wrapper.load_model()
+    
+    def close_categorizer_model(self):
+        """Close the categorizer model and free resources."""
+        self.categorizer_model_wrapper.close_model()
+        del self.categorizer_model_wrapper
+
+    def identify_batch(self, message_ids: List[str]) -> List[int]:
+        """Given a batch of messages, identify which ones need categorization.
+        
+        :param message_ids: List of message IDs in the batch.
+        :return: A tuple containing a list of uncategorized message IDs and their indices in the batch.
+        """
+        assert self.metafile_querier is not None, "MetafileQuerier connection is not open."
+        
+        categorized_ids = set(self.metafile_querier.match_ids(message_ids))
+        uncategorized_idx = [idx for idx, msg_id in enumerate(message_ids) if msg_id not in categorized_ids]
+        return uncategorized_idx
+
+    def categorize_message_batch(self, messages: List[Tuple[str, str, bool]]):
+        """Given a batch's subset of uncategorized messages, categorize them."""
+        for message_id, message_content, is_empty in messages:
+            if is_empty:
+                categories = [EMPTY_TAG]
+            else:
+                categories = self.categorizer_model_wrapper.categorize(message_id, message_content)
+            # TODO : write tagline to database and continue code
+
 
     def run(self):
-        pass
+        """Main categorization loop."""
+        self.open_connections()
+
+        for n, batch in enumerate(self.chroma_querier.stream_messages(include_content=True, include_metadata=True)): # TODO : after merge, account for offset
+            logger.debug(f"Processing batch (number {n})...")
+            assert batch["documents"] is not None, "Documents weren't fetched." # Linter enforcement
+            assert batch["metadatas"] is not None, "Metadatas weren't fetched." # Linter enforcement
+            uncategorized_idx = self.identify_batch(batch["ids"])
+
+            uncategorized_messages: List[Tuple[str, str, bool]] = []
+            for idx in uncategorized_idx:
+                message_id, message_content = batch["ids"][idx], batch["documents"][idx]
+                is_empty = batch["metadatas"][idx].get("empty_or_non_text", None)
+                assert is_empty is not None and isinstance(is_empty, bool), "Metadata missing 'empty_or_non_text' flag."
+                uncategorized_messages.append((message_id, message_content, is_empty))
+
+            self.categorize_message_batch(uncategorized_messages)
+
+        self.close_connections()
 
 
 def subprocess(worker_cls: type[Worker], config: WorkerConfig):
