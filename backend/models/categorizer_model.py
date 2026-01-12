@@ -105,6 +105,8 @@ class CategorizerModel(ABC):
 
         self.model_path = self._check_model_path(model_path)
         self.hardware = self._check_hardware_acceleration()
+        self.tokenizer: PreTrainedTokenizer
+        self.model: PreTrainedModel
         self.tokenizer, self.model = self._load_model()
 
     @property
@@ -281,7 +283,7 @@ class CategorizerModel(ABC):
         return categories
 
     @abstractmethod
-    def __del__(self):
+    def close(self):
         """
         Cleans up the model and tokenizer when the instance is deleted.
         This is important to free up resources, especially for large models.
@@ -501,7 +503,7 @@ CATEGORIZATION:"""
         logger.trace(f"Parsed categories: {categories}")
         return categories
 
-    def __del__(self):
+    def close(self):
         """
         Cleans up the model and tokenizer when the instance is deleted.
         This is important to free up resources, especially for large models.
@@ -510,8 +512,11 @@ CATEGORIZATION:"""
         """
         # TODO : prefer deterministic closing via explicit closer method calls
 
-        super().__del__()
-        torch.xpu.empty_cache()
+        super().close()
+        torch.xpu.empty_cache() 
+        # TODO : configure the code to store the cleanup method
+        # in a config file to account 
+        # for other hardwares/configs in the future
         logger.debug("Categorizer0 model and tokenizer cleaned up.")
 
     @property
