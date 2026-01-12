@@ -95,11 +95,12 @@ class Worker:
             sys.exit(46)  # 46 is a custom exit code for abort (leet speak "Ab = 46")
         
         def finished_exit(self):
-            logger.info("Exiting subprocess after successful completion.")
+            logger.success("Exiting subprocess after successful completion.")
             sys.exit(0)
 
         def __init__(self) -> None:
             self.register_signal_handlers()
+
 
     class APIMessenger:
         """
@@ -142,6 +143,7 @@ class Worker:
                 )
                 logger.warning("The job cannot be aborted through the API. Be advised.")
             
+            self.last_update = time()
             return False  # Do not abort the job if the connection fails
         
 
@@ -164,7 +166,8 @@ class Worker:
             except self.model.ExceedingSafetyLimitError:
                 logger.warning(f"Message [{message_id}] exceeded safety limit. Assigning BLACKLIST_TAG.")
                 return [BLACKLIST_TAG]
-    
+
+
     class ConnectionsWrapper:
         """
         Wraps the database connection classes for easy instantiation.
@@ -216,7 +219,6 @@ class Worker:
             uncategorized_idx = [idx for idx, msg_id in enumerate(message_ids) if msg_id not in categorized_ids]
             return uncategorized_idx
 
-
         def write_tagline(
             self,
             message_id: str,
@@ -237,20 +239,15 @@ class Worker:
         LoggerSetup.configure_logger(force_log_file=config["log_file"])
         
         self.signal_handler = self.SignalHandler()
-
-        self.api_endpoint = config["api_endpoint"]
-        self.api_messenger = self.APIMessenger(api_endpoint=self.api_endpoint)
-        
+        self.api_messenger = self.APIMessenger(api_endpoint=config["api_endpoint"])        
         self.categorizer_model_wrapper = self.CategorizerModelWrapper(model_type=config["categorizer_model_type"])
         self.connections_wrapper = self.ConnectionsWrapper(
             metafile_writer_type=config["metafile_writer_type"],
             metafile_querier_type=config["metafile_querier_type"],
             chroma_querier_type=config["chroma_querier_type"],
         )
-        
-        self.database_counts = config["database_counts"]
 
-        self.first_message: bool = True
+        self.database_counts = config["database_counts"]
 
 
     def open_connections(self):
@@ -259,6 +256,7 @@ class Worker:
     def close_connections(self):
         self.connections_wrapper.close_connections()
         del self.connections_wrapper
+
 
     def load_categorizer_model(self):
         """Instantiate the categorizer model."""
@@ -281,6 +279,7 @@ class Worker:
         self.processing_times = []
         self.total_processed = 0
         self.llm_processed = 0
+        self.first_message: bool = True
 
         logger.info("Initialization complete. Resources opened.")
     
@@ -289,6 +288,7 @@ class Worker:
         self.close_categorizer_model()
         self.close_connections()
         logger.info("Resources closed.")
+
 
     def console_log_progress(self):
         cur_time = time()
@@ -346,18 +346,23 @@ class Worker:
                 start_time = time()
                 categories = self.categorizer_model_wrapper.categorize(message_id, message_content)
                 end_time = time()
-                self.processing_times.append(end_time - start_time)
+                
+                self.api_messenger.post_wrapper(processed_messages=0, current_message_id=None)
+                # Notify no message is being processed, do not increment processed count
+
                 self.total_processed += 1
                 self.llm_processed += 1
+                
+                self.processing_times.append(end_time - start_time)
                 # Keep processing times list to last 100 entries to avoid memory issues
                 if len(self.processing_times) > 100:
                     self.processing_times = self.processing_times[-100:]
-            # TODO : write tagline to database and continue code
 
             self.connections_wrapper.write_tagline(
                 message_id=message_id,
                 categories=categories,
             )
+
             if time() - self.last_checked_time > 60*3:
                 # Console log every 3 minutes
                 self.console_log_progress()
@@ -371,6 +376,7 @@ class Worker:
         """
         assert batch["documents"] is not None, "Documents weren't fetched." # Linter enforcement
         assert batch["metadatas"] is not None, "Metadatas weren't fetched." # Linter enforcement
+
         uncategorized_idx = self.connections_wrapper.identify_batch(batch["ids"])
 
         uncategorized_messages: List[Tuple[str, str, bool]] = []
@@ -412,6 +418,11 @@ class Worker:
 
         if abort:
             logger.warning("Abort signal received from API. Exiting categorization process. Closing resources...")
+        else:
+            logger.success("Categorization process completed successfully. Closing resources...")
+            logger.info(f"Total messages examined: {self.total_processed}")
+            logger.info(f"Total messages processed by LLM: {self.llm_processed}")
+            logger.info(f"Total time elapsed: {display_time(time() - self.starting_time, duration=True)}")
         
         self.end_loops()
         logger.info("Resources closed. Exiting categorization process.")
@@ -422,13 +433,16 @@ def subprocess(worker_cls: type[Worker], config: WorkerConfig):
     abort = worker.run()
 
     # TODO :resource freeing necessary ?
-
     if abort:
         worker.signal_handler.abort_exit()
     else:
         worker.signal_handler.finished_exit()
+    
 
 class CategorizerEngine:
+    """
+    A master class in charge of aggregating data, and spawning and supervising the categorization subprocess.
+    """
     def set_io(self, api_endpoint: str) -> None:
         self.api_url = api_endpoint
         self.api_post_status = f"{self.api_url}/update"
@@ -439,9 +453,9 @@ class CategorizerEngine:
         categorizer_model: Optional[type[CategorizerModel]],
     ) -> None:
         if categorizer_model is not None:
-            self.categorizer_model_type = categorizer_model
+            self.categorizer_model_type: type[CategorizerModel] = categorizer_model
         else:
-            self.categorizer_model_type = Categorizer0
+            self.categorizer_model_type: type[CategorizerModel] = Categorizer0
         logger.info(f"Setting categorizer model: {self.categorizer_model_type.__name__}")
 
     def set_wrapper_classes(self) -> None:
@@ -472,7 +486,12 @@ class CategorizerEngine:
     ) -> None:
         """
         Initializes the categorizer engine.
-        This is a wrapper for the categorization loop.
+
+        :param api_endpoint: The API endpoint for job status updates.
+        :param override_categorizer_model: An optional categorizer model class to override the default.
+        :param stalling_timeout: Timeout in seconds to detect stalling in the subprocess.
+        :param LOG_FILE: Optional path to the log file.
+        :param CONSOLE_LOG_LEVEL: Optional console log level.
         """
         self.set_io(api_endpoint)
         self.ongoing_log_file = LoggerSetup.configure_logger(force_log_file=LOG_FILE, console_level=CONSOLE_LOG_LEVEL)
@@ -488,6 +507,25 @@ class CategorizerEngine:
         self.metafile_querier: MetafileQuerier = self.metafile_querier_type()
         self.chroma_querier: ChromaQuerier = self.chroma_querier_type()
 
+    def blacklist(self, faulty_id: str) -> None:
+        """
+        Blacklist a message that caused stalling by tagging it accordingly in the metafile database.
+        """
+        try:
+            self.metafile_writer.write_single_tagline(
+                message_id=faulty_id,
+                tags=[BLACKLIST_TAG],
+                check_for_duplicates=True,  # Should not happen. # Erratum : it happens.
+                # TODO : check how and why it happens.
+            )
+        except RuntimeError as e:
+            logger.error(
+                f"Collided with a duplicate when blacklisting {faulty_id}: {e}"
+            )
+            # Ignore the blacklisted message even on collision, I don't know how the collision happened,
+            # TODO : for now i'll ignore it, but investigate logs of the 04/07/25 to
+            # try to figure it out.
+
     def close_connections(self):
         """
         Close connections to the databases, and delete the attributes
@@ -499,6 +537,137 @@ class CategorizerEngine:
         del self.metafile_writer
         del self.metafile_querier
         del self.chroma_querier
+
+
+    class Supervisor:
+        """
+        Supervises the categorization subprocess, monitoring its status and handling stalling detection.
+        """
+        def __init__(
+                self,
+                api_post_status: str,
+                api_get_status: str,
+                stalling_timeout: int,
+            ) -> None:
+            self.api_post_status = api_post_status
+            self.api_get_status = api_get_status
+            self.stalling_timeout = stalling_timeout
+
+        def post_status(
+                self,
+                total_messages: Optional[int],
+                status: JobStatus,
+        ) -> None:
+            """
+            Post the current progress and status of the categorization job to the appropriate API endpoint.
+            This is used to update the job status and progress in the system, for UI and data tracking.
+            """
+            if status == JobStatus.ABORTED:
+                job_info = CategorizerJobInfo(
+                    status=status,
+                )
+            else:
+                job_info = CategorizerJobInfo(
+                    status=status,
+                    total_messages=total_messages,
+                    processed_messages=int(status == JobStatus.STALLED),
+                    # A stalling message gets blacklisted, and is thus technically getting processed
+                    last_update=time(),
+                )
+            
+            try:
+                post(self.api_post_status, json=job_info.model_dump())
+            except HTTPError as e:
+                logger.error(f"Failed to post job status: {e}")
+            except ConnectionError as e:
+                logger.error(f"Failed to connect to the job status endpoint: {e}. Is the server running?")
+
+        def check_for_timeouts(self) -> Union[str, None]:
+            """
+            Checks to detect subprocess stalling,
+            and if so returns the faulty message's id
+
+            """
+            response = get(self.api_get_status)
+
+            if response.status_code != 200:
+                logger.error(
+                    f"Failed to get job status from API: [{response.status_code} - {response.text}]"
+                )
+                return None
+            job_info = CategorizerJobInfo.model_validate(response.json())
+
+            if job_info.current_message_id is None:
+                logger.debug("Job current message ID is None. No stalling to check.")
+                return None
+            elif job_info.last_update is None:
+                logger.debug("Job last update is None. Cannot check for timeouts.")
+                return None
+
+            else:
+                elapsed_time = time() - job_info.last_update
+                if elapsed_time > self.stalling_timeout:
+                    logger.warning(f"Subprocess stalled for {elapsed_time} seconds.")
+                    faulty_id = job_info.current_message_id
+                    logger.info(f"Faulty message ID: {faulty_id}")
+                    return faulty_id
+                else:
+                    logger.debug(f"Subprocess is running fine. Elapsed time: {elapsed_time} seconds.")
+                    return None
+    
+        def kill_on_timeout(self, process: Process) -> None:
+            """
+            Kills the subprocess if it has stalled beyond the allowed timeout.
+
+            :param process: The monitored subprocess.
+            """
+            process.terminate()  # We rely on SIGTERM handlers, Unix-only.
+            # Post stalling status for user information
+            self.post_status(
+                total_messages=None,
+                status=JobStatus.STALLED,
+            )
+            process.join(timeout=5)
+            
+            # If the subprocess is still alive, we forcefully kill it
+            if process.is_alive():
+                logger.warning(
+                    f"Subprocess {process.pid} is still alive after termination. Force killing."
+                )
+                process.kill()
+
+        def parse_exit_code(self, exit_code: Union[int, None]) -> Tuple[bool, bool]:
+            """
+            Parses the exit code of the subprocess to determine if it was aborted.
+
+            Returns a tuple indicating whether the subprocess has finished,
+            and whether it ended normally or encountered an unhandled crash.
+
+            :param exit_code: The exit code of the subprocess.
+            :return: A tuple (finished: bool, normal_end: bool).
+            """
+            if exit_code == 0:
+                logger.success("Subprocess completed successfully.")
+                self.post_status(total_messages=None, status=JobStatus.COMPLETED)
+                return True, True
+            elif exit_code == 46:
+                logger.info("Subprocess exited with abort code.")
+                self.post_status(total_messages=None, status=JobStatus.ABORTED)
+                return True, True
+            elif exit_code in (143, -15):  # SIGTERM (compliant or forced on C extensions)
+                logger.info("Subprocess was terminated by SIGTERM. Reloading.")
+                return False, True
+            elif exit_code == -signal.SIGKILL:  # SIGKILL
+                logger.error("Subprocess was killed by SIGKILL. Assuming it stalled in low-level code, and restarting.")
+                return False, True
+            elif exit_code is None: # This happens when the process is killed by an unhandled signal
+                logger.error("Subprocess crashed by unhandled signal.")
+                return False, True  # Restart the subprocess
+            else:
+                logger.error(f"Subprocess exited with unknown code {exit_code}. Assuming critical crash.")
+                self.post_status(total_messages=None, status=JobStatus.FAILED)
+                return True, False
+
 
     class Planner:
         """
@@ -552,12 +721,17 @@ class CategorizerEngine:
                 first_uncategorized_offset = first_uncategorized_offset,
             )
 
-    # class Supervisor:
-    #     """
-    #     Supervises the categorization subprocess, monitoring its status and handling stalling detection.
-    #     """
-    #     pass
 
+    def setup_loop(self) -> None:
+        self.open_connections()
+        planner = self.Planner(
+            connection_wrappers=(
+                self.chroma_querier,
+                self.metafile_querier,
+            )
+        )
+        self.database_counts = planner.count_uncategorized_messages()
+        self.close_connections()
 
     def configure_worker(
             self,
@@ -574,19 +748,51 @@ class CategorizerEngine:
         }
         return worker_config
 
-    def setup_loop(self) -> None:
-        self.open_connections()
-        planner = self.Planner(
-            connection_wrappers=(
-                self.chroma_querier,
-                self.metafile_querier,
-            )
+    def prepare_for_start(self):
+        # TODO : dosctring
+        self.setup_loop()
+        
+        self.supervisor = self.Supervisor(
+            api_post_status=self.api_post_status,
+            api_get_status=self.api_get_status,
+            stalling_timeout=self.stalling_timeout,
         )
-        self.database_counts = planner.count_uncategorized_messages()
-        self.close_connections()
+        self.supervisor.post_status(
+            total_messages=self.database_counts["total_uncategorized"],
+            status=JobStatus.RUNNING,
+        )
 
-    # def start(self):
-    #     worker_config = self.configure_worker(database_counts=self.database_counts)
-    #     p = Process(target=subprocess, args=(Worker, worker_config)) # spawned, not forked
-    #     p.start()
-    #     p.join()
+    def start(self):
+        """
+        Starts the categorization subprocess.
+        Requires prior setup_loop() call to establish database counts.
+        """
+        worker_config = self.configure_worker(database_counts=self.database_counts)
+        self.process = Process(target=subprocess, args=(Worker, worker_config)) # spawned, not forked
+        self.process.start()
+    
+    def run_categorization(self):
+        """
+        Runs the categorization process, supervising the subprocess and handling stalling detection.
+        """
+        self.prepare_for_start()
+
+        finished, normal_end = False, False
+        while not finished:
+            self.start()
+            logger.info(f"Subprocess started with PID {self.process.pid}. Listening for stalling.")
+
+            while self.process.is_alive():
+                sleep(self.stalling_timeout // 4)
+                faulty_id = self.supervisor.check_for_timeouts()
+                if faulty_id is not None:
+                    self.blacklist(faulty_id)
+                    self.supervisor.kill_on_timeout(self.process)
+                    break
+
+            exit_code = self.process.exitcode
+            finished, normal_end = self.supervisor.parse_exit_code(exit_code)
+        
+        if not normal_end:
+            logger.critical("Categorization subprocess ended abnormally. Please check the logs for details.")
+        logger.info("Categorization engine shutting down.")
