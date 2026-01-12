@@ -570,7 +570,8 @@ class CategorizerEngine:
                 force_log_file=LOG_FILE,
             )
             self.categorizer_model_type: type[CategorizerModel] = categorizer_model_type
-            self.api_endpoint: Optional[str] = api_endpoint     
+            self.api_endpoint: Optional[str] = api_endpoint
+            self.metafile_writer, self.metafile_querier, self.chroma_querier = connection_wrappers
 
         def set_helpers(self):
             self.signal_handler = self.SignalHandler()
