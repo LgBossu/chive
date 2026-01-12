@@ -325,12 +325,11 @@ class CategorizerEngine:
                 first_uncategorized_offset = first_uncategorized_offset,
             )
 
-    class Supervisor:
-        """
-        Supervises the categorization subprocess, monitoring its status and handling stalling detection.
-        """
-        pass
-        # TODO : add closer method to free resources when done
+    # class Supervisor:
+    #     """
+    #     Supervises the categorization subprocess, monitoring its status and handling stalling detection.
+    #     """
+    #     pass
 
 
     def configure_worker(self) -> WorkerConfig:
