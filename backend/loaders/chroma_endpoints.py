@@ -401,6 +401,15 @@ class ChromaUpserter:
             updated_conversations=[conv.title for conv in self.conversation_loader],
         )
 
+    def close(self) -> None:
+        """
+        Close the ChromaDB client connection.
+        """
+        logger.debug("Closing ChromaDB client connection.")
+        del self.client 
+        # ChromaDB PersistentClient (ClientAPI) does not have a close method. We dereference the API instead.
+        # TODO : future versions might use other clients that expose explicit closing.
+        # Make sure to be aware and update in consequence.
 
 class ChromaQuerier:
     def __init__(self, client: Optional[chromadb.api.ClientAPI] = None) -> None:
@@ -658,8 +667,16 @@ class ChromaQuerier:
             if len(query_res["ids"]) < batch_size:
                 # Reached the end of the collection
                 break
-
-
+    
+    def close(self) -> None:
+        """
+        Close the ChromaDB client connection.
+        """
+        logger.debug("Closing ChromaDB client connection.")
+        del self.client 
+        # ChromaDB PersistentClient (ClientAPI) does not have a close method. We dereference the API instead.
+        # TODO : future versions might use other clients that expose explicit closing.
+        # Make sure to be aware and update in consequence.
 
 class ChromaCreator:
     """
