@@ -35,7 +35,7 @@ class DatabaseCounts(TypedDict):
     total_uncategorized: int
     nonempty_uncategorized: int
     empty_uncategorized: int
-    first_uncategorized_offset: Optional[int] # Let's us skip to the first uncategorized message directly
+    first_uncategorized_offset: Optional[int] # Lets us skip to the first uncategorized message directly
 
 def display_time(seconds: float, tz: int = 1, duration: bool = False) -> str:
     _, seconds = divmod(seconds, 86400)
