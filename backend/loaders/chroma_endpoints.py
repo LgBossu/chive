@@ -289,26 +289,6 @@ class ChromaQuerier:
         self.conv_collection = self.client.get_collection(self.conv_collection_name)
         self.mess_collection = self.client.get_collection(self.mess_collection_name)
 
-    # def close(self) -> None:
-    #     """Attempt to close or cleanup the underlying client if supported."""
-    #     if self.client is None:
-    #         pass
-    #     else:
-    #         # Linter and intellisense help
-    #         assert isinstance(self.client, chromadb.api.ClientAPI)
-    #         # Current version does not seem to have a close or shutdown method
-    #         del self.client
-    #         self.client = None
-    #     return None
-
-    def __del__(self):
-        # TODO : check that this destructor is sufficient
-        logger.info(f"Deleting ChromaQuerier instance {self.__repr__()}.")
-        try:
-            self.close()
-        except Exception as e:
-            logger.error(f"Failed to close ChromaQuerier associated client: {e}")
-
     def _fully_query(
         self,
         query: QueryDatabaseModel,
@@ -553,102 +533,6 @@ class ChromaQuerier:
             logger.error(f"Error processing get result of conversation contents by ID: {e}")
             raise ValueError("Error processing get result of conversation contents by ID.") from e
 
-    # GET ALL METHODS ARE TO BE DEPRECATED
-    # TODO : DEPRECATE AND REPLACE WITH STREAMING METHODS
-    # def get_all_nonempty_messages(self) -> np.ndarray:
-    #     """
-    #     Retrieve all messages from the ChromaDB messages collection.
-
-    #     This method filters out empty or non-text messages by checking the `empty_or_non_text`
-    #     metadata field.
-
-    #     :raises ValueError: If no documents are retrieved or if there is a mismatch
-    #         between the number of IDs and documents retrieved from the messages collection.
-    #     """
-    #     logger.debug("Retrieving all messages from the ChromaDB messages collection.")
-    #     # Some chroma versions return all results in a single batch via get()
-    #     # We use get(include=[documents]) and expect either a flat list of ids/documents
-    #     # or a batched structure. Handle both cases and yield pairs.
-    #     query_res = self.mess_collection.get(
-    #         where={"empty_or_non_text": False},
-    #         include=[ChromaInclude.documents],
-    #     )
-
-    #     ids = query_res["ids"]
-    #     documents = query_res["documents"]
-    #     if documents is None:
-    #         logger.critical("No documents retrieved from messages collection.")
-    #         raise ValueError("No documents retrieved from messages collection.")
-    #     if len(ids) != len(documents):
-    #         logger.critical(
-    #             "Mismatch between number of IDs and documents retrieved from messages collection."
-    #         )
-    #         raise ValueError(
-    #             "Mismatch between number of IDs and documents retrieved from messages collection."
-    #         )
-
-    #     logger.debug(f"Retrieved {len(ids)} messages from the collection.")
-
-    #     # If batch-style (lists of lists), flatten by batch
-    #     if ids and isinstance(ids[0], list):
-    #         for batch_idx in range(len(ids)):
-    #             batch_ids = ids[batch_idx]
-    #             batch_docs = documents[batch_idx]
-    #             for i, doc in enumerate(batch_docs):
-    #                 yield (str(batch_ids[i]), str(doc))
-    #     else:
-    #         for i, doc in enumerate(documents):
-    #             yield (str(ids[i]), str(doc))
-
-    # def get_all_empty_messages(self) -> Generator[str, None, None]:
-    #     """
-    #     Lazily iterate over all empty message ids in the collection.
-
-    #     Yields message_id strings.
-
-    #     This method filters messages that are marked as empty or non-text content
-    #     by checking the `empty_or_non_text` metadata field.
-    #     It returns a 1D numpy array containing the IDs of the empty messages.
-    #     """
-    #     logger.debug("Retrieving all empty messages from the ChromaDB messages collection.")
-
-    #     query_res = self.mess_collection.get(
-    #         where={"empty_or_non_text": True},
-    #         include=[],
-    #     )
-
-    #     ids = query_res["ids"]
-    #     # If batched, flatten
-    #     if ids and isinstance(ids[0], list):
-    #         for batch in ids:
-    #             for mid in batch:
-    #                 yield str(mid)
-    #     else:
-    #         for mid in ids:
-    #             yield str(mid)
-    #     logger.debug(f"Retrieved {len(ids)} empty messages from the collection.")
-
-    # def get_all_nonempty_count(self) -> int:
-    #     """Return the count of non-empty messages without storing all documents.
-
-    #     :return: The count of non-empty messages
-    #     :rtype: int"""
-    #     query_res = self.mess_collection.get(where={"empty_or_non_text": False}, include=[])
-    #     ids = query_res.get("ids") or []
-    #     if ids and isinstance(ids[0], list):
-    #         return sum(len(batch) for batch in ids)
-    #     return len(ids)
-
-    # def get_all_empty_count(self) -> int:
-    #     """Return the count of empty messages without storing all documents.
-
-    #     :return: The count of empty messages
-    #     :rtype: int"""
-    #     query_res = self.mess_collection.get(where={"empty_or_non_text": True}, include=[])
-    #     ids = query_res.get("ids") or []
-    #     if ids and isinstance(ids[0], list):
-    #         return sum(len(batch) for batch in ids)
-    #     return len(ids)
 
     def get_conversation_title(self, conversation_id: str) -> str:
         """
@@ -719,6 +603,7 @@ class ChromaQuerier:
                 # Reached the end of the collection
                 break
     
+
     def close(self) -> None:
         """
         Close the ChromaDB client connection.
@@ -728,6 +613,7 @@ class ChromaQuerier:
         # ChromaDB PersistentClient (ClientAPI) does not have a close method. We dereference the API instead.
         # TODO : future versions might use other clients that expose explicit closing.
         # Make sure to be aware and update in consequence.
+
 
 class ChromaCreator:
     """
