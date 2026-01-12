@@ -637,6 +637,7 @@ class ChromaQuerier:
             batch_size: int = 10000,
             include_content: bool = False,
             include_metadata: bool = False,
+            offset: int = 0,
         ) -> Iterable[chromadb.api.types.GetResult]:
         """
         Stream messages from the ChromaDB messages collection in batches.
@@ -653,7 +654,6 @@ class ChromaQuerier:
         if include_metadata:
             include_fields.append(ChromaInclude.metadatas)
 
-        offset = 0
         while True:
             query_res: chromadb.GetResult = self.mess_collection.get(
                 limit=batch_size,
