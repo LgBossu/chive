@@ -55,6 +55,10 @@ class WorkerConfig(TypedDict):
 
     # Model type and wrapper classes
     categorizer_model_type: type[CategorizerModel]
+    metafile_writer_type: type[MetafileWriter]
+    metafile_querier_type: type[MetafileQuerier]
+    chroma_querier_type: type[ChromaQuerier]
+
 
 class Worker:
     class Subclass:
@@ -207,10 +211,14 @@ class CategorizerEngine:
             "log_file": self.ongoing_log_file,
             "api_endpoint": self.api_url,
             "categorizer_model_type": self.categorizer_model_type,
+            "metafile_writer_type": self.metafile_writer_type,
+            "metafile_querier_type": self.metafile_querier_type,
+            "chroma_querier_type": self.chroma_querier_type,
         }
         return worker_config
 
     def start(self):
+        worker_config = self.configure_worker()
         p = Process(target=subprocess, args=(Worker, worker_config)) # spawned, not forked
         p.start()
         p.join()
