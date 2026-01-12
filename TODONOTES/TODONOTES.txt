@@ -1,0 +1,3 @@
+Consider including a file or way to inject a specific stack's config into the backend categorization worker, to maximize compatibility with different setups and hardwares. Shipping environment variables or config files on demand could help the worker adapt to various deployment scenarios.
+
+See: TODONOTES/LLM_GPU_CONFIG.md
