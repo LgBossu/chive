@@ -1,8 +1,8 @@
 [tool.poetry]
 name = "chatgpt-post-processing"
-version = "0.1.0"
-description = "A repository for post-processing my ChatGPT conversations"
-authors = ["Louis-Guillaume Bossu <louis-guillaume.bossu@polytechnique.edu>"]
+version = "2026.2.0"
+description = "A project about post-processing my ChatGPT conversations."
+authors = ["Louis-Guillaume Bossu <louis-guillaume.bossu@polytechnique.org>"]
 package-mode = false
 
 [tool.poetry.group.dev.dependencies]
@@ -13,36 +13,30 @@ ruff = "^0.6.5"
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
-# [[tool.poetry.source]]
-# name = "pytorch-xpu-preview"
-# url = "https://download.pytorch.org/whl/test/xpu"
-# priority = "explicit"
-
 [tool.poetry.dependencies]
-python = "^3.12"
+python = "3.12.*"
+
+pytorch-triton-xpu = {url = "https://download.pytorch.org/whl/pytorch_triton_xpu-3.4.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl#sha256=df4bb3282bac9a3b90231700077110d8680b338416de03c2b7c6133c9b602649"}
+torch = {url = "https://download.pytorch.org/whl/xpu/torch-2.8.0%2Bxpu-cp312-cp312-linux_x86_64.whl#sha256=e19db8135bde12a4357e5ca09f0176083ba9e70554dd6c90725a19b21690cbad"}
+torchvision = {url = "https://download.pytorch.org/whl/xpu/torchvision-0.23.0%2Bxpu-cp312-cp312-manylinux_2_28_x86_64.whl#sha256=0acec355b80c3899841184084f365df336c508602812e34a44007b8b60d53af4"}
+torchaudio = {url = "https://download.pytorch.org/whl/xpu/torchaudio-2.8.0%2Bxpu-cp312-cp312-manylinux_2_28_x86_64.whl#sha256=9f1d68e82a2754fd4dbce6664e6e7ca84bdec1ff346ca69f034758ad8d8078c4"}
+intel-extension-for-pytorch = {url = "https://download.pytorch-extension.intel.com/ipex_stable/xpu/intel_extension_for_pytorch-2.8.10%2Bxpu-cp312-cp312-linux_x86_64.whl"}
+oneccl-bind-pt = {url = "https://download.pytorch-extension.intel.com/ipex_stable/xpu/oneccl_bind_pt-2.8.0%2Bxpu-cp312-cp312-linux_x86_64.whl"}
 
 numpy = "*"
-
-torch = { url = "https://download.pytorch.org/whl/test/xpu/torch-2.6.0%2Bxpu-cp312-cp312-linux_x86_64.whl"}
-pytorch-triton-xpu = { url = "https://download.pytorch.org/whl/test/pytorch_triton_xpu-3.2.0-cp312-cp312-linux_x86_64.whl"}
-triton = { url = "https://download.pytorch.org/whl/test/triton-3.2.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl"}
-torchvision = {url = "https://download.pytorch.org/whl/test/xpu/torchvision-0.21.0%2Bxpu-cp312-cp312-linux_x86_64.whl"}
-
 transformers = "*"
 accelerate = "*"
-# datasets = "*"
 tokenizers = "*"
+scipy = "*"
+# datasets = "*"
 # sentencepiece = "^0.1.99"
 # protobuf = "*"
-scipy = "*"
 
 notebook = "*"
 loguru = "*"
 matplotlib = "*"
 python-dotenv = "*"
 huggingface-hub = "*"
-# optimum = "^1.23.3"
-# intel-extension-for-pytorch = "^2.5.0"
 optimum-intel = "^1.21.0"
 openvino = "^2024.6.0"
 dotenv = "^0.9.9"
@@ -52,6 +46,7 @@ scikit-learn = "^1.6.1"
 scikit-image = "^0.25.2"
 nbstripout = "^0.8.1"
 fastapi = "^0.115.13"
+# optimum = "^1.23.3"
 
 
 [tool.mypy]
