@@ -131,10 +131,16 @@ class CategorizerEngine:
         self.chroma_querier: ChromaQuerier = self.chroma_querier_type()
 
     def close_connections(self):
-        """Close connections to the databases"""
+        """
+        Close connections to the databases, and delete the attributes
+        (connections need to be reinstantiated to be reopened).
+        """
         self.metafile_writer.close()
         self.metafile_querier.close()
         self.chroma_querier.close()
+        del self.metafile_writer
+        del self.metafile_querier
+        del self.chroma_querier
 
     class Planner:
         """
