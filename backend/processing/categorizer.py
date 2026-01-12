@@ -784,6 +784,7 @@ class CategorizerEngine:
             while self.process.is_alive():
                 sleep(self.stalling_timeout // 4)
                 faulty_id = self.supervisor.check_for_timeouts()
+
                 if faulty_id is not None:
                     self.blacklist(faulty_id)
                     self.supervisor.kill_on_timeout(self.process)
