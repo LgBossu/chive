@@ -401,6 +401,15 @@ class ChromaUpserter:
             updated_conversations=[conv.title for conv in self.conversation_loader],
         )
 
+    def close(self) -> None:
+        """
+        Close the ChromaDB client connection.
+        """
+        logger.debug("Closing ChromaDB client connection.")
+        del self.client 
+        # ChromaDB PersistentClient (ClientAPI) does not have a close method. We dereference the API instead.
+        # TODO : future versions might use other clients that expose explicit closing.
+        # Make sure to be aware and update in consequence.
 
 class ChromaQuerier:
     def __init__(self, client: Optional[chromadb.api.ClientAPI] = None) -> None:
@@ -538,6 +547,8 @@ class ChromaQuerier:
             logger.error(f"Error processing get result of conversation contents by ID: {e}")
             raise ValueError("Error processing get result of conversation contents by ID.") from e
 
+    # GET ALL METHODS ARE TO BE DEPRECATED
+    # TODO : DEPRECATE AND REPLACE WITH STREAMING METHODS
     def get_all_nonempty_messages(self) -> np.ndarray:
         """
         Retrieve all messages from the ChromaDB messages collection.
@@ -620,7 +631,52 @@ class ChromaQuerier:
         }
         logger.debug(f"Document counts: {counts}")
         return counts
+    
+    def stream_messages(
+            self,
+            batch_size: int = 10000,
+            include_content: bool = False,
+            include_metadata: bool = False,
+            offset: int = 0,
+        ) -> Iterable[chromadb.api.types.GetResult]:
+        """
+        Stream messages from the ChromaDB messages collection in batches.
 
+        :param batch_size: The number of messages to retrieve in each batch (default is 5000)
+        :param include_content: Whether to include message content in the output (default is False)
+        :param include_metadata: Whether to include metadata in the output (default is False)
+        :return: An iterable of dictionaries containing message IDs,
+                 and optionally content and metadata.
+        """
+        include_fields = []
+        if include_content:
+            include_fields.append(ChromaInclude.documents)
+        if include_metadata:
+            include_fields.append(ChromaInclude.metadatas)
+
+        while True:
+            query_res: chromadb.GetResult = self.mess_collection.get(
+                limit=batch_size,
+                offset=offset,
+                include=include_fields,
+            )
+            
+            offset += batch_size
+            yield query_res
+
+            if len(query_res["ids"]) < batch_size:
+                # Reached the end of the collection
+                break
+    
+    def close(self) -> None:
+        """
+        Close the ChromaDB client connection.
+        """
+        logger.debug("Closing ChromaDB client connection.")
+        del self.client 
+        # ChromaDB PersistentClient (ClientAPI) does not have a close method. We dereference the API instead.
+        # TODO : future versions might use other clients that expose explicit closing.
+        # Make sure to be aware and update in consequence.
 
 class ChromaCreator:
     """

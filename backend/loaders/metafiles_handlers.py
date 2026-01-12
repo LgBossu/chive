@@ -11,6 +11,13 @@ from loguru import logger
 from backend.loaders.chroma_endpoints import ChromaQuerier
 from backend.utils.path_utils import get_paths
 
+# TODO // # WARNING :
+# dynamic_tags is an FTS5 table used as a presence index (message_id → tags).
+# This is convenient but not ideal: FTS5 is not optimized for key-based joins.
+# Current TEMP-table JOIN logic works but may be suboptimal.
+# Revisit only after streaming/batching and OOM issues are fully resolved.
+
+
 # TODO : deeply analyze this module for potential memory leaks on linking operations.
 # Up to estimated 8GB of RAM usage is measured on system monitor :
 # Verify if this is due to module level manipulation, design issues, or other factors.
@@ -171,6 +178,14 @@ class Linker(ABC):
         current_to_tags = self.link_current_to_tags(message_to_tags)
         logger.info("Linking pipeline completed")
         return current_to_tags
+    
+    def close(self) -> None:
+        """
+        Close any resources held by the Linker.
+
+        This method should be called when the Linker is no longer needed.
+        """
+        pass
 
 
 class LegacyLinker(Linker):
@@ -442,7 +457,7 @@ class MetafileWriter:
         self.sqlite_connection.commit()
         logger.info("All tags written to the dynamic tags database successfully")
 
-    def close_dynamic_tags_db(self) -> None:
+    def close(self) -> None:
         """
         Close the connection to the dynamic tags database.
 
@@ -454,14 +469,16 @@ class MetafileWriter:
         else:
             logger.warning("Dynamic tags database connection was already closed")
 
-    def __del__(self):
-        """
-        Destructor to ensure the database connection is closed when the object is deleted.
-        """
-        self.close_dynamic_tags_db()
-        logger.debug(
-            f"MetafileWriter instance {self.__repr__()} deleted, database connection closed"
-        )
+    # def __del__(self):
+    #     """
+    #     Destructor to ensure the database connection is closed when the object is deleted.
+    #     """
+    #     # TODO : prefer deterministic closing via explicit closer method calls
+
+    #     self.close()
+    #     logger.debug(
+    #         f"MetafileWriter instance {self.__repr__()} deleted, database connection closed"
+    #     )
 
     def deduplicate_table(self) -> None:
         """
@@ -515,8 +532,39 @@ class MetafileQuerier:
             ).fetchall()
         ]
         return tagged_ids
+    
+    def match_ids(self, ids: List[str]) -> List[str]:
+        """
+        Given a list of message IDs, return the subset that exists in the dynamic tags database.
 
-    def close_dynamic_tags_db(self) -> None:
+        :param ids: A list of message IDs to check.
+        :return: A list of message IDs that exist in the dynamic tags database.
+        """
+        self.sqlite_cursor.execute("DROP TABLE IF EXISTS _temp_ids;")
+        self.sqlite_cursor.execute(
+            "CREATE TEMPORARY TABLE _temp_ids (candidate_id TEXT PRIMARY KEY);"
+        )
+
+        self.sqlite_cursor.executemany(
+            "INSERT OR IGNORE INTO _temp_ids (candidate_id) VALUES (?);",
+            [(message_id,) for message_id in ids],
+        )
+
+        matched_ids = [
+            row[0]
+            for row in self.sqlite_cursor.execute(
+                """
+                SELECT ti.candidate_id
+                FROM _temp_ids ti
+                INNER JOIN dynamic_tags dt ON ti.candidate_id = dt.message_id;
+                """
+            ).fetchall()
+        ]
+
+        self.sqlite_cursor.execute("DROP TABLE IF EXISTS _temp_ids;")
+        return matched_ids
+
+    def close(self) -> None:
         """
         Close the connection to the dynamic tags database.
 
@@ -528,14 +576,16 @@ class MetafileQuerier:
         else:
             logger.warning("Dynamic tags database connection was already closed")
 
-    def __del__(self):
-        """
-        Destructor to ensure the database connection is closed when the object is deleted.
-        """
-        self.close_dynamic_tags_db()
-        logger.debug(
-            f"MetafileQuerier instance {self.__repr__()} deleted, database connection closed"
-        )
+    # def __del__(self):
+    #     """
+    #     Destructor to ensure the database connection is closed when the object is deleted.
+    #     """
+    #     # TODO : prefer deterministic closing via explicit closer method calls
+
+    #     self.close()
+    #     logger.debug(
+    #         f"MetafileQuerier instance {self.__repr__()} deleted, database connection closed"
+    #     )
 
 
 if __name__ == "__main__":
