@@ -59,6 +59,9 @@ class WorkerConfig(TypedDict):
     metafile_querier_type: type[MetafileQuerier]
     chroma_querier_type: type[ChromaQuerier]
 
+    # Categorization loop data
+    database_counts: DatabaseCounts
+
 
 class Worker:
     class SignalHandler:
@@ -332,7 +335,10 @@ class CategorizerEngine:
     #     pass
 
 
-    def configure_worker(self) -> WorkerConfig:
+    def configure_worker(
+            self,
+            database_counts:DatabaseCounts,
+        ) -> WorkerConfig:
         worker_config: WorkerConfig = {
             "log_file": self.ongoing_log_file,
             "api_endpoint": self.api_url,
@@ -340,11 +346,23 @@ class CategorizerEngine:
             "metafile_writer_type": self.metafile_writer_type,
             "metafile_querier_type": self.metafile_querier_type,
             "chroma_querier_type": self.chroma_querier_type,
+            "database_counts": database_counts,
         }
         return worker_config
 
-    def start(self):
-        worker_config = self.configure_worker()
-        p = Process(target=subprocess, args=(Worker, worker_config)) # spawned, not forked
-        p.start()
-        p.join()
+    def setup_loop(self) -> None:
+        self.open_connections()
+        planner = self.Planner(
+            connection_wrappers=(
+                self.chroma_querier,
+                self.metafile_querier,
+            )
+        )
+        self.database_counts = planner.count_uncategorized_messages()
+        self.close_connections()
+
+    # def start(self):
+    #     worker_config = self.configure_worker(database_counts=self.database_counts)
+    #     p = Process(target=subprocess, args=(Worker, worker_config)) # spawned, not forked
+    #     p.start()
+    #     p.join()
