@@ -4,7 +4,7 @@ import sys
 from multiprocessing import Process, get_start_method, set_start_method
 from pathlib import Path
 from time import sleep, time
-from typing import Optional, Tuple, TypedDict, Union
+from typing import List, Optional, Tuple, TypedDict, Union
 
 
 from loguru import logger
@@ -144,6 +144,21 @@ class Worker:
             
             return False  # Do not abort the job if the connection fails
         
+    class CategorizerModelWrapper:
+        """
+        Wraps the categorizer model for easy instantiation and usage.
+        """
+        def __init__(self, model_type: type[CategorizerModel]) -> None:
+            self.model_type = model_type
+        
+        def load_model(self) -> None:
+            self.model = self.model_type()
+        
+        def close_model(self) -> None:
+            self.model.close()
+
+        def categorize(self, message_content: str) -> List[str]:
+            return self.model.categorize(message_content)
 
     def __init__(self, config:WorkerConfig) -> None:
         LoggerSetup.configure_logger(force_log_file=config["log_file"])
