@@ -155,6 +155,7 @@ class Worker:
             sys.exit(0)
 
         def __init__(self) -> None:
+            logger.trace("Signal handler initialization")
             self.register_signal_handlers()
 
 
@@ -163,8 +164,16 @@ class Worker:
         Handles API communication for job status updates.
         """
         def __init__(self, api_endpoint: str) -> None:
+            logger.debug(f"Initializing APIMessenger, bound to endpoint: {api_endpoint}")
             self.api_endpoint = api_endpoint
             self.last_update: Union[float, None] = None
+
+        @property
+        def pre_post_log(self) -> str:
+            res = "Posting job progress to API.\n"
+            res += " "*8 + "-- Target endpoint: {endpoint}\n"
+            res += " "*8 + "-- Payload: {payload}"
+            return res
 
         def post_wrapper(
             self,
@@ -172,7 +181,6 @@ class Worker:
             current_message_id: Optional[str] = None,
             current_speed: Optional[float] = None,
             processed_messages: int = 1,  # Increment processed messages by 1
-            total_messages: Optional[int] = None,
         ) -> bool:
             if self.last_update is None:
                 self.last_update = time()
@@ -187,6 +195,8 @@ class Worker:
                 current_speed=current_speed,
             )
 
+            logger.debug(self.pre_post_log.format(endpoint=self.api_endpoint, payload=job_info.model_dump()))
+            response = None
             try:
                 response = post(self.api_endpoint, json=job_info.model_dump())
                 response.raise_for_status()
@@ -200,13 +210,10 @@ class Worker:
                     logger.debug(f"Received signal from API: {abort_signal}")
                     return abort_signal == "##ABORT##"  # TODO : do NOT hardcode
             except HTTPError as e:
+                logger.warning(f"HTTP error raised from response: {response.text if response is not None else '[No Content]'}")
                 logger.error(f"Failed to post job progress: {e}")
-                logger.warning("The job cannot be aborted through the API. Be advised.")
             except ConnectionError as e:
-                logger.error(
-                    f"Failed to connect to the job progress endpoint: {e}. Is the server running?"
-                )
-                logger.warning("The job cannot be aborted through the API. Be advised.")
+                logger.error(f"Failed to connect to the job progress endpoint: {e}. Is the server running?")
             
             self.last_update = time()
             return False  # Do not abort the job if the connection fails
@@ -217,15 +224,21 @@ class Worker:
         Wraps the categorizer model for easy instantiation and usage.
         """
         def __init__(self, model_type: type[CategorizerModel]) -> None:
+            logger.debug(f"Initializing CategorizerModelWrapper with model type: {model_type.__name__}")
             self.model_type = model_type
         
         def load_model(self) -> None:
+            logger.debug("Worker wrapper loading categorizer model...")
             self.model = self.model_type()
+            logger.debug("Categorizer model loaded successfully.")
         
         def close_model(self) -> None:
+            logger.debug("Worker wrapper closing categorizer model...")
             self.model.close()
+            logger.debug("Categorizer model closed successfully.")
 
         def categorize(self, message_id: str, message_content: str) -> List[str]:
+            logger.trace(f"Calling categorization model on message [{message_id}].")
             try:
                 return self.model.categorize(message_content)
             except self.model.ExceedingSafetyLimitError:
@@ -243,22 +256,27 @@ class Worker:
             metafile_querier_type: type[MetafileQuerier],
             chroma_querier_type: type[ChromaQuerier],
         ) -> None:
+            logger.trace("Initializing ConnectionsWrapper.")
             self.metafile_writer_type = metafile_writer_type
             self.metafile_querier_type = metafile_querier_type
             self.chroma_querier_type = chroma_querier_type
         
         def open_connections(self):
+            logger.debug("ConnectionsWrapper opening database connections...")
             self.metafile_writer: MetafileWriter = self.metafile_writer_type()
             self.metafile_querier: MetafileQuerier = self.metafile_querier_type()
             self.chroma_querier: ChromaQuerier = self.chroma_querier_type()
-        
+            logger.debug("Database connections opened successfully.")
+
         def close_connections(self):
+            logger.debug("ConnectionsWrapper closing database connections...")
             self.metafile_writer.close()
             self.metafile_querier.close()
             self.chroma_querier.close()
             del self.metafile_writer
             del self.metafile_querier
             del self.chroma_querier
+            logger.debug("Database connections closed successfully.")
 
         def stream_messages(
             self,
@@ -266,6 +284,7 @@ class Worker:
             include_metadata: bool = True,
             offset: int = 0,
         ):
+            logger.trace("ConnectionsWrapper streaming messages from ChromaQuerier (forwarding iterable).")
             return self.chroma_querier.stream_messages(
                 include_content=include_content,
                 include_metadata=include_metadata,
@@ -280,6 +299,7 @@ class Worker:
             """
             assert self.metafile_querier is not None, "MetafileQuerier connection is not open."
             
+            logger.trace(f"Matching {len(message_ids)} message IDs against metafile database.")
             categorized_ids = set(self.metafile_querier.match_ids(message_ids))
             uncategorized_idx = [idx for idx, msg_id in enumerate(message_ids) if msg_id not in categorized_ids]
             return uncategorized_idx
@@ -289,6 +309,7 @@ class Worker:
             message_id: str,
             categories: List[str],
         ) -> None:
+            logger.trace(f"Writing tagline for message [{message_id}] with categories: {categories}")
             try:
                 self.metafile_writer.write_single_tagline(
                     message_id=message_id,
@@ -302,6 +323,7 @@ class Worker:
 
     def __init__(self, config:WorkerConfig) -> None:
         LoggerSetup.configure_logger(force_log_file=config["log_file"])
+        logger.debug("Initializing Worker with provided configuration...")
         
         self.signal_handler = self.SignalHandler()
         self.api_messenger = self.APIMessenger(api_endpoint=config["api_endpoint"])        
@@ -387,6 +409,7 @@ class Worker:
         abort = False
 
         for message_id, message_content, is_empty in messages:
+            logger.trace(f"Processing message [{message_id}]. Empty flag: {is_empty}")
             if self.first_message:
                 abort = self.api_messenger.post_wrapper(processed_messages=0, current_message_id=message_id)
                 self.first_message = False
@@ -402,6 +425,7 @@ class Worker:
                 )
 
             if abort:
+                logger.info("Forwarding positive abort signal from API. Breaking categorization loop.")
                 break
 
             if is_empty:
@@ -439,6 +463,7 @@ class Worker:
         
         :return: True if the process was aborted, False otherwise.
         """
+        logger.debug(f"Preprocessing and validating batch of {len(batch['ids'])} messages.")
         assert batch["documents"] is not None, "Documents weren't fetched." # Linter enforcement
         assert batch["metadatas"] is not None, "Metadatas weren't fetched." # Linter enforcement
 
@@ -459,6 +484,7 @@ class Worker:
         
         :return: True if the process was aborted, False otherwise.
         """
+        logger.info("Starting worker categorization loop...")
         if self.database_counts["total_uncategorized"] is None:
             # TODO : handle differently ?
             logger.info("No uncategorized messages found. Exiting categorization loop.")
@@ -512,6 +538,7 @@ class CategorizerEngine:
         self.api_url = api_endpoint
         self.api_post_status = f"{self.api_url}/update"
         self.api_get_status = f"{self.api_url}/status"
+        logger.debug(f"CategorizerEngine I/O set to API endpoints: {self.api_post_status}, {self.api_get_status}")
     
     def set_categorizer_model(
         self,
@@ -558,24 +585,29 @@ class CategorizerEngine:
         :param LOG_FILE: Optional path to the log file.
         :param CONSOLE_LOG_LEVEL: Optional console log level.
         """
+        logger.debug("Initializing CategorizerEngine...")
         self.set_io(api_endpoint)
         self.ongoing_log_file = LoggerSetup.configure_logger(force_log_file=LOG_FILE, console_level=CONSOLE_LOG_LEVEL)
         self.set_categorizer_model(override_categorizer_model)
         self.set_wrapper_classes()
         self.stalling_timeout = stalling_timeout
         self.set_subprocess_start_method()
+        logger.info("CategorizerEngine initialized successfully.")
 
 
     def open_connections(self) -> None:
         """Instantiate connections to the databases"""
+        logger.debug("CategorizerEngine opening database connections...")
         self.metafile_writer: MetafileWriter = self.metafile_writer_type()
         self.metafile_querier: MetafileQuerier = self.metafile_querier_type()
         self.chroma_querier: ChromaQuerier = self.chroma_querier_type()
+        logger.debug("Database connections opened successfully.")
 
     def blacklist(self, faulty_id: str) -> None:
         """
         Blacklist a message that caused stalling by tagging it accordingly in the metafile database.
         """
+        logger.info(f"Blacklisting message ID: {faulty_id}")
         try:
             self.metafile_writer.write_single_tagline(
                 message_id=faulty_id,
@@ -596,12 +628,14 @@ class CategorizerEngine:
         Close connections to the databases, and delete the attributes
         (connections need to be reinstantiated to be reopened).
         """
+        logger.debug("CategorizerEngine closing database connections...")
         self.metafile_writer.close()
         self.metafile_querier.close()
         self.chroma_querier.close()
         del self.metafile_writer
         del self.metafile_querier
         del self.chroma_querier
+        logger.info("Database connections closed successfully.")
 
 
     class Supervisor:
@@ -614,6 +648,7 @@ class CategorizerEngine:
                 api_get_status: str,
                 stalling_timeout: int,
             ) -> None:
+            logger.debug(f"Initializing Supervisor with endpoints: {api_post_status}, {api_get_status} -- Stalling timeout: {stalling_timeout}s")
             self.api_post_status = api_post_status
             self.api_get_status = api_get_status
             self.stalling_timeout = stalling_timeout
@@ -640,6 +675,7 @@ class CategorizerEngine:
                     last_update=time(),
                 )
             
+            logger.debug(f"Posting job status to API endpoint {self.api_post_status}:\n  -- {job_info.model_dump()}")
             try:
                 post(self.api_post_status, json=job_info.model_dump())
             except HTTPError as e:
@@ -651,8 +687,8 @@ class CategorizerEngine:
             """
             Checks to detect subprocess stalling,
             and if so returns the faulty message's id
-
             """
+            logger.trace("Routine check for subprocess timeouts.")
             response = get(self.api_get_status)
 
             if response.status_code != 200:
@@ -660,6 +696,8 @@ class CategorizerEngine:
                     f"Failed to get job status from API: [{response.status_code} - {response.text}]"
                 )
                 return None
+
+            logger.trace("Successfully retrieved job status from API.")
             job_info = CategorizerJobInfo.model_validate(response.json())
 
             if job_info.current_message_id is None:
@@ -686,6 +724,7 @@ class CategorizerEngine:
 
             :param process: The monitored subprocess.
             """
+            logger.warning(f"Terminating subprocess {process.pid} due to stalling beyond timeout.")
             process.terminate()  # We rely on SIGTERM handlers, Unix-only.
             # Post stalling status for user information
             self.post_status(
@@ -696,9 +735,7 @@ class CategorizerEngine:
             
             # If the subprocess is still alive, we forcefully kill it
             if process.is_alive():
-                logger.warning(
-                    f"Subprocess {process.pid} is still alive after termination. Force killing."
-                )
+                logger.warning(f"Subprocess {process.pid} is still alive after termination. Force killing.")
                 process.kill()
 
         def parse_exit_code(self, exit_code: Union[int, None]) -> Tuple[bool, bool]:
@@ -711,6 +748,7 @@ class CategorizerEngine:
             :param exit_code: The exit code of the subprocess.
             :return: A tuple (finished: bool, normal_end: bool).
             """
+            logger.info("Parsing subprocess exit code.")
             if exit_code == 0:
                 logger.success("Subprocess completed successfully.")
                 self.post_status(total_messages=None, status=JobStatus.COMPLETED)
@@ -741,6 +779,7 @@ class CategorizerEngine:
         def __init__(self,
                      connection_wrappers: Tuple[ChromaQuerier, MetafileQuerier],
                      ) -> None:
+            logger.debug("Initializing Planner.")
             self.chroma_querier, self.metafile_querier = connection_wrappers
         
         def count_uncategorized_messages(self) -> DatabaseCounts:
@@ -748,16 +787,20 @@ class CategorizerEngine:
             Counts the number of uncategorized messages in the database.
             Returns a tuple of (total count,non-empty uncategorized count, empty uncategorized count).
             """
-            start_time = time()
             logger.debug("Counting uncategorized messages in the database...")
 
+            start_time = time()
             total_uncategorized = 0
             nonempty_uncategorized = 0
             empty_uncategorized = 0
-
             first_uncategorized_offset: Optional[int] = None
 
+            batches_count = 0
+
             for batch in self.chroma_querier.stream_messages(include_metadata=True):
+                batches_count += 1
+                logger.trace(f"Processing {batches_count}th. Elapsed time so far: {display_time(time() - start_time, duration=True)}")
+                
                 assert batch["metadatas"] is not None, "Metadatas weren't fetched." # Linter enforcement
 
                 categorized_ids = set(self.metafile_querier.match_ids(batch['ids']))
@@ -802,6 +845,7 @@ class CategorizerEngine:
             self,
             database_counts:DatabaseCounts,
         ) -> WorkerConfig:
+        logger.trace("Setting up worker configuration.")
         worker_config: WorkerConfig = {
             "log_file": self.ongoing_log_file,
             "api_endpoint": self.api_url,
@@ -814,7 +858,12 @@ class CategorizerEngine:
         return worker_config
 
     def prepare_for_start(self):
-        # TODO : dosctring
+        """
+        Prepares the categorization engine for starting the subprocess.
+        Sets up the monitoring supervisor and posts the initial job status.
+        """
+        logger.trace("Planning subprocess startup.")
+
         self.setup_loop()
         
         self.supervisor = self.Supervisor(
@@ -833,7 +882,9 @@ class CategorizerEngine:
         Requires prior setup_loop() call to establish database counts.
         """
         worker_config = self.configure_worker(database_counts=self.database_counts)
+        
         self.process = Process(target=subprocess, args=(Worker, worker_config)) # spawned, not forked
+        logger.info("Starting categorization subprocess.")
         self.process.start()
     
     def run_categorization(self):
