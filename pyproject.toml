@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "chatgpt-post-processing"
-version = "2026.2.0"
+version = "2026.3.1"
 description = "A project about post-processing my ChatGPT conversations."
 authors = ["Louis-Guillaume Bossu <louis-guillaume.bossu@polytechnique.org>"]
 package-mode = false
