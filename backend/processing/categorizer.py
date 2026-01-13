@@ -848,7 +848,7 @@ class CategorizerEngine:
         logger.trace("Setting up worker configuration.")
         worker_config: WorkerConfig = {
             "log_file": self.ongoing_log_file,
-            "api_endpoint": self.api_url,
+            "api_endpoint": self.api_post_status,
             "categorizer_model_type": self.categorizer_model_type,
             "metafile_writer_type": self.metafile_writer_type,
             "metafile_querier_type": self.metafile_querier_type,
