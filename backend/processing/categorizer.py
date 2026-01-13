@@ -267,7 +267,6 @@ class Worker:
             self.metafile_querier: MetafileQuerier = self.metafile_querier_type()
             self.chroma_querier: ChromaQuerier = self.chroma_querier_type()
             logger.debug("Database connections opened successfully.")
-
         def close_connections(self):
             logger.debug("ConnectionsWrapper closing database connections...")
             self.metafile_writer.close()
@@ -277,6 +276,38 @@ class Worker:
             del self.metafile_querier
             del self.chroma_querier
             logger.debug("Database connections closed successfully.")
+
+
+        def open_chroma(self):
+            logger.debug("ConnectionsWrapper opening ChromaQuerier connection...")
+            self.chroma_querier = self.chroma_querier_type()
+            logger.debug("ChromaQuerier connection opened successfully.")
+        def close_chroma(self):
+            logger.debug("ConnectionsWrapper closing ChromaQuerier connection...")
+            self.chroma_querier.close()
+            del self.chroma_querier
+            logger.debug("ChromaQuerier connection closed successfully.")
+
+        def open_metafile_querier(self):
+            logger.debug("ConnectionsWrapper opening MetafileQuerier connection...")
+            self.metafile_querier = self.metafile_querier_type()
+            logger.debug("MetafileQuerier connection opened successfully.")
+        def close_metafile_querier(self):
+            logger.debug("ConnectionsWrapper closing MetafileQuerier connection...")
+            self.metafile_querier.close()
+            del self.metafile_querier
+            logger.debug("MetafileQuerier connection closed successfully.")
+
+        def open_metafile_writer(self):
+            logger.debug("ConnectionsWrapper opening MetafileWriter connection...")
+            self.metafile_writer = self.metafile_writer_type()
+            logger.debug("MetafileWriter connection opened successfully.")
+        def close_metafile_writer(self):
+            logger.debug("ConnectionsWrapper closing MetafileWriter connection...")
+            self.metafile_writer.close()
+            del self.metafile_writer
+            logger.debug("MetafileWriter connection closed successfully.")
+
 
         def stream_messages(
             self,
@@ -300,7 +331,11 @@ class Worker:
             assert self.metafile_querier is not None, "MetafileQuerier connection is not open."
             
             logger.trace(f"Matching {len(message_ids)} message IDs against metafile database.")
+
+            self.open_metafile_querier()
             categorized_ids = set(self.metafile_querier.match_ids(message_ids))
+            self.close_metafile_querier()
+            
             uncategorized_idx = [idx for idx, msg_id in enumerate(message_ids) if msg_id not in categorized_ids]
             return uncategorized_idx
 
@@ -311,11 +346,13 @@ class Worker:
         ) -> None:
             logger.trace(f"Writing tagline for message [{message_id}] with categories: {categories}")
             try:
+                self.open_metafile_writer()
                 self.metafile_writer.write_single_tagline(
                     message_id=message_id,
                     tags=categories,
                     check_for_duplicates=True, # Should still not happen. Big red flag if it does.
                 )
+                self.close_metafile_writer()
                 logger.debug(f"Tags written for message {message_id}: {categories}")
             except RuntimeError as e:
                 logger.critical(f"Failed to write tags for message {message_id}: {e}")
@@ -337,12 +374,11 @@ class Worker:
         self.database_counts = config["database_counts"]
 
 
-    def open_connections(self):
-        self.connections_wrapper.open_connections()
-    
-    def close_connections(self):
-        self.connections_wrapper.close_connections()
-        del self.connections_wrapper
+    # def open_connections(self):
+    #     self.connections_wrapper.open_connections()
+    # def close_connections(self):
+    #     self.connections_wrapper.close_connections()
+    #     del self.connections_wrapper
 
 
     def load_categorizer_model(self):
@@ -358,7 +394,7 @@ class Worker:
     def initialize_loops(self):
         logger.info("Initializing categorization loops and opening connections...")
         
-        self.open_connections()
+        self.connections_wrapper.open_chroma()
         self.load_categorizer_model()
 
         self.starting_time = time()
@@ -373,7 +409,7 @@ class Worker:
     def end_loops(self):
         logger.info("Closing categorization loops and freeing resources...")
         self.close_categorizer_model()
-        self.close_connections()
+        self.connections_wrapper.close_chroma()
         logger.info("Resources closed.")
 
 
@@ -488,7 +524,6 @@ class Worker:
         if self.database_counts["total_uncategorized"] is None:
             # TODO : handle differently ?
             logger.info("No uncategorized messages found. Exiting categorization loop.")
-            self.close_connections()
             return False
         assert self.database_counts["first_uncategorized_offset"] is not None # For mypy linter
 
@@ -518,6 +553,7 @@ class Worker:
         self.end_loops()
         logger.info("Resources closed. Exiting categorization process.")
         return abort
+
 
 def subprocess(worker_cls: type[Worker], config: WorkerConfig):
     worker = worker_cls(config)
@@ -598,7 +634,7 @@ class CategorizerEngine:
     def open_connections(self) -> None:
         """Instantiate connections to the databases"""
         logger.debug("CategorizerEngine opening database connections...")
-        self.metafile_writer: MetafileWriter = self.metafile_writer_type()
+        # self.metafile_writer: MetafileWriter = self.metafile_writer_type()
         self.metafile_querier: MetafileQuerier = self.metafile_querier_type()
         self.chroma_querier: ChromaQuerier = self.chroma_querier_type()
         logger.debug("Database connections opened successfully.")
@@ -629,40 +665,14 @@ class CategorizerEngine:
         (connections need to be reinstantiated to be reopened).
         """
         logger.debug("CategorizerEngine closing database connections...")
-        self.metafile_writer.close()
+        # self.metafile_writer.close()
         self.metafile_querier.close()
         self.chroma_querier.close()
-        del self.metafile_writer
+        # del self.metafile_writer
         del self.metafile_querier
         del self.chroma_querier
         logger.info("Database connections closed successfully.")
 
-    def close_chroma_connection(self):
-        """
-        Close only the ChromaDB connection.
-        """
-        logger.debug("CategorizerEngine closing ChromaDB connection...")
-        self.chroma_querier.close()
-        del self.chroma_querier
-        logger.info("ChromaDB connection closed successfully.")
-    
-    def close_metafile_writer(self):
-        """
-        Close only the MetafileWriter connection.
-        """
-        logger.debug("CategorizerEngine closing MetafileWriter connection...")
-        self.metafile_writer.close()
-        del self.metafile_writer
-        logger.info("MetafileWriter connection closed successfully.")
-    
-    def close_metafile_querier(self):
-        """
-        Close only the MetafileQuerier connection.
-        """
-        logger.debug("CategorizerEngine closing MetafileQuerier connection...")
-        self.metafile_querier.close()
-        del self.metafile_querier
-        logger.info("MetafileQuerier connection closed successfully.")
 
     class Supervisor:
         """
@@ -865,8 +875,7 @@ class CategorizerEngine:
             )
         )
         self.database_counts = planner.count_uncategorized_messages()
-        self.close_chroma_connection()
-        self.close_metafile_querier()
+        self.close_connections()
 
     def configure_worker(
             self,
@@ -930,14 +939,18 @@ class CategorizerEngine:
                 faulty_id = self.supervisor.check_for_timeouts()
 
                 if faulty_id is not None:
+                    # Open a writer connection to blacklist the faulty message
+                    self.metafile_writer = self.metafile_writer_type()
                     self.blacklist(faulty_id)
+                    self.metafile_writer.close()
+                    del self.metafile_writer
+
                     self.supervisor.kill_on_timeout(self.process)
                     break
 
             exit_code = self.process.exitcode
             finished, normal_end = self.supervisor.parse_exit_code(exit_code)
         
-        self.close_metafile_writer()
         if not normal_end:
             logger.critical("Categorization subprocess ended abnormally. Please check the logs for details.")
         logger.info("Categorization engine shutting down.")
