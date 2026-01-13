@@ -180,7 +180,7 @@ async def update_db_status():
     """
     Endpoint to get the current status of the database update.
     """
-    logger.trace("Fetching database update job status.")
+    # logger.trace("Fetching database update job status.")
     cache: UpdaterJobInfo = app.state.cache.update_db_cache
     return cache
 
@@ -289,7 +289,7 @@ async def categorizer_update(update: CategorizerJobInfo):
 
 @app.get("/categorizer/status", response_model=CategorizerJobInfo)
 async def categorizer_status():
-    logger.trace("Fetching categorizer job status.")
+    # logger.trace("Fetching categorizer job status.")
 
     cache: CategorizerJobInfo = app.state.cache.categorizer_cache
     return cache
