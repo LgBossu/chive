@@ -572,7 +572,7 @@ class CategorizerEngine:
         self,
         api_endpoint: str,
         override_categorizer_model: Optional[type[CategorizerModel]] = None,
-        stalling_timeout: int = 45,
+        stalling_timeout: int = 60,
         LOG_FILE: Optional[Path] = None,
         CONSOLE_LOG_LEVEL: Optional[str] = "DEBUG",
     ) -> None:
@@ -637,6 +637,32 @@ class CategorizerEngine:
         del self.chroma_querier
         logger.info("Database connections closed successfully.")
 
+    def close_chroma_connection(self):
+        """
+        Close only the ChromaDB connection.
+        """
+        logger.debug("CategorizerEngine closing ChromaDB connection...")
+        self.chroma_querier.close()
+        del self.chroma_querier
+        logger.info("ChromaDB connection closed successfully.")
+    
+    def close_metafile_writer(self):
+        """
+        Close only the MetafileWriter connection.
+        """
+        logger.debug("CategorizerEngine closing MetafileWriter connection...")
+        self.metafile_writer.close()
+        del self.metafile_writer
+        logger.info("MetafileWriter connection closed successfully.")
+    
+    def close_metafile_querier(self):
+        """
+        Close only the MetafileQuerier connection.
+        """
+        logger.debug("CategorizerEngine closing MetafileQuerier connection...")
+        self.metafile_querier.close()
+        del self.metafile_querier
+        logger.info("MetafileQuerier connection closed successfully.")
 
     class Supervisor:
         """
@@ -839,7 +865,8 @@ class CategorizerEngine:
             )
         )
         self.database_counts = planner.count_uncategorized_messages()
-        self.close_connections()
+        self.close_chroma_connection()
+        self.close_metafile_querier()
 
     def configure_worker(
             self,
@@ -910,8 +937,8 @@ class CategorizerEngine:
             exit_code = self.process.exitcode
             finished, normal_end = self.supervisor.parse_exit_code(exit_code)
         
+        self.close_metafile_writer()
         if not normal_end:
             logger.critical("Categorization subprocess ended abnormally. Please check the logs for details.")
         logger.info("Categorization engine shutting down.")
         # TODO : check if any remaining resources need to be freed
-        
