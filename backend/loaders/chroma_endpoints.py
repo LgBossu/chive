@@ -265,7 +265,11 @@ class ChromaUpserter:
         Close the ChromaDB client connection.
         """
         logger.debug("Closing ChromaDB client connection.")
-        del self.client 
+        try:
+            del self.client 
+        except AttributeError as e:
+            logger.error(f"Error closing ChromaDB client connection: {e}\n Was it already closed?")
+            
         # ChromaDB PersistentClient (ClientAPI) does not have a close method. We dereference the API instead.
         # TODO : future versions might use other clients that expose explicit closing.
         # Make sure to be aware and update in consequence.
