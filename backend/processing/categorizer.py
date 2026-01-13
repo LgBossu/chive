@@ -328,8 +328,6 @@ class Worker:
             :param message_ids: List of message IDs in the batch.
             :return: A tuple containing a list of uncategorized message IDs and their indices in the batch.
             """
-            assert self.metafile_querier is not None, "MetafileQuerier connection is not open."
-            
             logger.trace(f"Matching {len(message_ids)} message IDs against metafile database.")
 
             self.open_metafile_querier()
