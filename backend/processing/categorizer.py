@@ -181,8 +181,9 @@ class Worker:
             current_message_id: Optional[str] = None,
             current_speed: Optional[float] = None,
             processed_messages: int = 1,  # Increment processed messages by 1
+            update_time: bool = False,
         ) -> bool:
-            if self.last_update is None:
+            if self.last_update is None or update_time:
                 self.last_update = time()
 
             job_info = CategorizerJobInfo(
@@ -215,7 +216,6 @@ class Worker:
             except ConnectionError as e:
                 logger.error(f"Failed to connect to the job progress endpoint: {e}. Is the server running?")
             
-            self.last_update = time()
             return False  # Do not abort the job if the connection fails
         
 
@@ -470,7 +470,7 @@ class Worker:
                 categories = self.categorizer_model_wrapper.categorize(message_id, message_content)
                 end_time = time()
 
-                self.api_messenger.post_wrapper(processed_messages=0, current_message_id=None)
+                self.api_messenger.post_wrapper(processed_messages=0, current_message_id=None, update_time=True)
                 # Notify no message is being processed, do not increment processed count
 
                 self.total_processed += 1
