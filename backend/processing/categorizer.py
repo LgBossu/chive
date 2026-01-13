@@ -189,8 +189,16 @@ class Worker:
 
             try:
                 response = post(self.api_endpoint, json=job_info.model_dump())
-                abort_signal = response.json()["command"]
-                return abort_signal == "##ABORT##"  # TODO : do NOT hardcode
+                response.raise_for_status()
+
+                abort_signal = response.json().get("command", None)
+                if abort_signal is None:
+                    logger.error(f"No 'command' field in API response: {response.text}")
+                    logger.warning("Ignoring non-existent abort signal. Continuing.")
+                    return False
+                else:
+                    logger.debug(f"Received signal from API: {abort_signal}")
+                    return abort_signal == "##ABORT##"  # TODO : do NOT hardcode
             except HTTPError as e:
                 logger.error(f"Failed to post job progress: {e}")
                 logger.warning("The job cannot be aborted through the API. Be advised.")
