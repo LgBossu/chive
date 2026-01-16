@@ -5,13 +5,13 @@ import os
 
 # --- Pydantic Models ---
 
-class APIURL(BaseModel):
+class APIEndpoints(BaseModel):
     UPDATE_DB: str
 
 class APIConfig(BaseModel):
     HOST: str
     PORT: int
-    URL: APIURL
+    ENDPOINTS: APIEndpoints
     ABORT_SIGNAL: str
 
 class LiteralTags(BaseModel):
