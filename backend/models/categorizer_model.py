@@ -13,7 +13,13 @@ from transformers.models.auto.tokenization_auto import AutoTokenizer
 from transformers.tokenization_utils import PreTrainedTokenizer
 
 from backend.utils.path_utils import get_paths
+from backend.utils.config_utils import get_config, get_prompts
 
+CONFIG = get_config()
+PROMPTS = get_prompts()
+
+default_model_config = CONFIG.PARAMS.MODELS.default_model_config
+Cat0_config = CONFIG.PARAMS.MODELS.Categorizer0
 
 class CategorizerModel(ABC):
     """
@@ -124,8 +130,6 @@ class CategorizerModel(ABC):
         :return: A tuple containing the prefix and suffix of the prompt.
         :rtype: Tuple[str, str]
         """
-        # TODO : also consider storing the prompts in a separate proper file,
-        # to avoid hardcoding and allow for easy editing and tuning.
         pass
 
     @property
@@ -193,7 +197,9 @@ class CategorizerModel(ABC):
         """
         pass
 
-    def _generate(self, input_tokens, max_output_length: int = 128):
+
+
+    def _generate(self, input_tokens, max_output_length: int = default_model_config.max_output_length):
         """
         Generates a response from the model based on the input tokens.
 
@@ -201,8 +207,6 @@ class CategorizerModel(ABC):
         :param max_output_length: The maximum length of the generated output.
         :return: The generated output from the model.
         """
-        # TODO : max_output length should be configurable, not hardcoded.
-
         logger.debug("Generating response from the model.")
         with torch.no_grad():
             output = self.model.generate(
@@ -253,7 +257,7 @@ class CategorizerModel(ABC):
         self,
         message: str,
         max_output_length: Optional[int] = None,
-        safety_input_length: int = 2048,
+        safety_input_length: Optional[int] = None,
     ) -> List[str]:
         """
         Categorizes the given message by constructing a prompt, tokenizing it,
@@ -265,6 +269,8 @@ class CategorizerModel(ABC):
         """
         if max_output_length is None:
             max_output_length = self.recommended_output_length
+        if safety_input_length is None:
+            safety_input_length = self.safe_max_length
 
         logger.trace("Categorizing message")
         full_prompt = self._construct_full_prompt(message)
@@ -382,30 +388,8 @@ class Categorizer0(CategorizerModel):
         :return: A tuple containing the prefix and suffix of the prompt.
         :rtype: Tuple[str, str]
         """
-
-        prompt_begin = """You are a helpful assistant. Given a user message, your job is to identify its main topic(s) or emotional theme(s) in a few simple words.
-
-- Return a short, comma-separated list of themes.
-- Output only the list.
-- If the message has no meaningful content, respond with: none.
-- End your response with <END>.
-
-Here are some examples:
-
-MESSAGE: [ok lol!]
-CATEGORIZATION: none <END>
-
-MESSAGE: [I'm feeling a bit overwhelmed, but also proud of the work I did today.]
-CATEGORIZATION: stress, accomplishment, self-reflection <END>
-
-MESSAGE: [I just made saffron rice with lemon and it actually turned out amazing!]
-CATEGORIZATION: cooking, food, pride <END>
-
-MESSAGE: ["""  # noqa: E501
-
-        prompt_end = """]
-CATEGORIZATION:"""
-
+        prompt_begin = PROMPTS.Categorizer0.prefix
+        prompt_end = PROMPTS.Categorizer0.suffix
         return prompt_begin, prompt_end
 
     @property
@@ -423,7 +407,7 @@ CATEGORIZATION:"""
         # Always call:  preds = model.generate(**tok, **config.DECODING)
         # so any future tweak happens in a single place and can be guarded by tests.
 
-        parameters = {
+        parameters = { # TODO : de-hardcode
             "min_length": 1,  # Make sure it returns *something*
             "repetition_penalty": 1.1,
             # no_repeat_ngram_size:2,
@@ -447,7 +431,7 @@ CATEGORIZATION:"""
         :return: The maximum length in tokens.
         :rtype: int
         """
-        return 2048
+        return CONFIG.PARAMS.MODELS.Categorizer0.safety_input_length
 
     def _clean_llm_output(self, output: str) -> str:
         """

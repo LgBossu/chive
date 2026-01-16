@@ -22,11 +22,14 @@ from backend.models.app_models import (
 )
 from backend.models.message_tree import MessageTree
 from backend.utils.log_setup import LoggerSetup
+from backend.utils.config_utils import get_config
 
 # Set up user logging
 logger_setup = LoggerSetup()
 LOG_PATH = logger_setup.configure_logger()
 
+API_CONFIG = get_config().API
+CONFIG_ENDPOINTS = API_CONFIG.ENDPOINTS
 
 # [AI GENERATED CODE]
 # Filter to suppress logs for status endpoints
@@ -95,7 +98,7 @@ async def favicon():
     return FileResponse("frontend/assets/icons/applogo.ico")
 
 
-@app.post("/update_db/run", response_model=PlainResponse)
+@app.post(CONFIG_ENDPOINTS.UPDATE_DB.RUN, response_model=PlainResponse)
 async def update_db_run():
     """
     Endpoint to trigger the database update.
@@ -123,7 +126,7 @@ async def update_db_run():
     return PlainResponse(message="Database update started.")
 
 
-@app.post("/update_db/abort", response_model=PlainResponse)
+@app.post(CONFIG_ENDPOINTS.UPDATE_DB.ABORT, response_model=PlainResponse)
 async def update_db_abort():
     """
     Endpoint to abort the database update job.
@@ -144,7 +147,7 @@ async def update_db_abort():
     return PlainResponse(message="Database update command set to ABORT.")
 
 
-@app.post("/update_db/update", response_model=CommandResponse)
+@app.post(CONFIG_ENDPOINTS.UPDATE_DB.UPDATE, response_model=CommandResponse)
 async def update_db_update(update: UpdaterJobInfo):
     """
     Endpoint to update the status of the database update job.
@@ -175,7 +178,7 @@ async def update_db_update(update: UpdaterJobInfo):
     return CommandResponse(command=command)
 
 
-@app.get("/update_db/status", response_model=UpdaterJobInfo)
+@app.get(CONFIG_ENDPOINTS.UPDATE_DB.STATUS, response_model=UpdaterJobInfo)
 async def update_db_status():
     """
     Endpoint to get the current status of the database update.
@@ -185,7 +188,7 @@ async def update_db_status():
     return cache
 
 
-@app.post("/categorizer/run", response_model=PlainResponse)
+@app.post(CONFIG_ENDPOINTS.CATEGORIZER.RUN, response_model=PlainResponse)
 async def categorizer_start():
     """
     Endpoint to start a categorizer job.
@@ -213,7 +216,7 @@ async def categorizer_start():
     return PlainResponse(message="Categorizer job started.")
 
 
-@app.post("/categorizer/abort", response_model=PlainResponse)
+@app.post(CONFIG_ENDPOINTS.CATEGORIZER.ABORT, response_model=PlainResponse)
 async def categorizer_abort():
     """
     Endpoint to abort the categorizer job.
@@ -234,7 +237,7 @@ async def categorizer_abort():
     return PlainResponse(message="Categorizer job command set to ABORT.")
 
 
-@app.post("/categorizer/update", response_model=CommandResponse)
+@app.post(CONFIG_ENDPOINTS.CATEGORIZER.UPDATE, response_model=CommandResponse)
 async def categorizer_update(update: CategorizerJobInfo):
     """
     Endpoint to update the status of the categorizer job.
@@ -287,7 +290,7 @@ async def categorizer_update(update: CategorizerJobInfo):
     return CommandResponse(command=command)
 
 
-@app.get("/categorizer/status", response_model=CategorizerJobInfo)
+@app.get(CONFIG_ENDPOINTS.CATEGORIZER.STATUS, response_model=CategorizerJobInfo)
 async def categorizer_status():
     # logger.trace("Fetching categorizer job status.")
 
@@ -295,7 +298,7 @@ async def categorizer_status():
     return cache
 
 
-@app.get("/search", response_class=StreamingResponse)
+@app.get(CONFIG_ENDPOINTS.SEARCH_ROOT, response_class=StreamingResponse)
 async def search(query: QueryDatabaseModel):
     logger.trace(f"Searching for files with query: {query.query_text}")
 
@@ -334,4 +337,4 @@ async def search(query: QueryDatabaseModel):
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("backend.app:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("backend.app:app", host=API_CONFIG.HOST, port=API_CONFIG.PORT, reload=True)

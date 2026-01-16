@@ -14,9 +14,12 @@ from backend.models.app_models import (
 from backend.models.message_node import MessageNode
 from backend.processing.categorizer import categorize
 from backend.utils.log_setup import LoggerSetup
+from backend.utils.config_utils import get_config
 
-API_ENDPOINT = "http://127.0.0.1:8000"  # TODO : do not hardcode endpoints
-UPDATE_DB_ENDPOINT = "http://127.0.0.1:8000/update_db/update"  # TODO : do not hardcode endpoints
+CONFIG = get_config()
+
+API_ENDPOINT = f"{CONFIG.API.HOST}:{CONFIG.API.PORT}"
+UPDATE_DB_ENDPOINT = f"{API_ENDPOINT}{CONFIG.API.ENDPOINTS.UPDATE_DB}"
 
 
 def update_db(log_path: Path):

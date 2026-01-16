@@ -19,6 +19,7 @@ from backend.loaders.metafiles_handlers import (
 from backend.models.app_models import CategorizerJobInfo, JobStatus
 from backend.models.categorizer_model import Categorizer0, CategorizerModel
 from backend.utils.log_setup import LoggerSetup
+from backend.utils.config_utils import get_config
 
 from chromadb.api.types import GetResult
 
@@ -86,8 +87,10 @@ from chromadb.api.types import GetResult
 
 # TODO : make a list and scheme somewhere of WHO owns WHAT objects, to ensure proper and consistent resource freeing
 
+CONFIG = get_config()
 
-NO_STALLING_ID = "[NotAnId]"
+ABORT_SIGNAL = CONFIG.API.ABORT_SIGNAL
+NO_STALLING_ID = CONFIG.PARAMS.CATEGORIZER.NO_STALLING_ID
 
 class DatabaseCounts(TypedDict):
     total_uncategorized: int
@@ -209,7 +212,7 @@ class Worker:
                     return False
                 else:
                     logger.debug(f"Received signal from API: {abort_signal}")
-                    return abort_signal == "##ABORT##"  # TODO : do NOT hardcode
+                    return abort_signal == ABORT_SIGNAL
             except HTTPError as e:
                 logger.warning(f"HTTP error raised from response: {response.text if response is not None else '[No Content]'}")
                 logger.error(f"Failed to post job progress: {e}")

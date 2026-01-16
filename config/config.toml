@@ -1,0 +1,43 @@
+
+[API]
+HOST = "http://127.0.0.1"
+PORT = 8000
+ABORT_SIGNAL = "##ABORT##"
+
+[API.ENDPOINTS]
+UPDATE_DB_ROOT = "/update_db"
+CATEGORIZER_ROOT = "/categorizer"
+SEARCH_ROOT = "/search"
+
+[API.ENDPOINTS.UPDATE_DB]
+RUN = "/update_db/run"
+ABORT = "/update_db/abort"
+UPDATE = "/update_db/update"
+STATUS = "/update_db/status"
+
+[API.ENDPOINTS.CATEGORIZER]
+RUN = "/categorizer/run"
+ABORT = "/categorizer/abort"
+UPDATE = "/categorizer/update"
+STATUS = "/categorizer/status"
+
+[DB.LITERAL_TAGS]
+BLACKLIST_TAG = "######"
+EMPTY_TAG = "##EMPTY##"
+NO_TAGS_TAG = "##NO_TAGS##"
+
+[PARAMS.CATEGORIZER]
+STALL_SECONDS = 60
+STALL_CHECK_FREQ = 5
+NO_STALLING_ID = "[NotAnId]"
+
+[PARAMS.MODELS.default_model_config]
+max_output_length = 128
+safety_input_length = 2048
+
+[PARAMS.MODELS.Categorizer0]
+max_output_length = 128
+safety_input_length = 2048
+
+[PARAMS.HARDWARE.torch]
+hardware_acceleration = "xpu"
