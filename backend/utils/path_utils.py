@@ -41,24 +41,24 @@ def get_paths() -> Paths:
     return Paths(
         # Use SESSION_TIMESTAMP so the filename is static during the session.
         log_file=Path(os.environ["LOG_PATH"].format(time=SESSION_TIMESTAMP)),
-        # Source, db, metafiles
+
         source_conversations_path=Path(os.environ["SOURCE_JSON_PATH"]),
         chroma_db_path=Path(os.environ["PERSISTENT_CHROMADB_PATH"]),
         metafiles_dir=Path(os.environ["METAFILES_DIR_PATH"]),
-        # Legacy paths
+
         metafiles_legacy_dir=Path(os.environ["METAFILES_LEGACY_DIR"]),
         legacy_chroma_dir=Path(os.environ["LEGACY_CHROMA_DIR"]),
-        # Metafiles directory navigation
+
         dynamic_tags_db=(
             Path(os.environ["METAFILES_DIR_PATH"]) / Path(os.environ["DYNAMIC_TAGS_DB"])
         ),
-        # LLM model path
+
         small_model_path=Path(os.environ["SMALL_LLM_MODEL_PATH"]),
     )
 
 
 if __name__ == "__main__":
-    logger.debug("Summoned get_paths")
+    logger.debug("Running path_utils.py")
     paths = get_paths()
     # Loop through the dataclass fields for logging.
     for key, value in paths.__dict__.items():
