@@ -470,9 +470,12 @@ class Worker:
                 categories = self.categorizer_model_wrapper.categorize(message_id, message_content)
                 end_time = time()
 
-                self.api_messenger.post_wrapper(processed_messages=0, current_message_id=None, update_time=True)
+                post_abort = self.api_messenger.post_wrapper(processed_messages=0, current_message_id=None, update_time=True)
                 # Notify no message is being processed, do not increment processed count
-
+                if post_abort:
+                    logger.info("Forwarding positive abort signal from API after LLM processing. Saving progress and ceasing categorization loop.")  # noqa: E501
+                    abort = True
+                    
                 self.total_processed += 1
                 self.llm_processed += 1
                 
