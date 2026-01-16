@@ -3,7 +3,7 @@ HOST = "http://127.0.0.1"
 PORT = 8000
 ABORT_SIGNAL = "##ABORT##"
 
-[API.URL]
+[API.ENDPOINTS]
 UPDATE_DB = "update_db/update"
 
 [DB.LITERAL_TAGS]
