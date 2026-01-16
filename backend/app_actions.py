@@ -14,9 +14,9 @@ from backend.models.app_models import (
 from backend.models.message_node import MessageNode
 from backend.processing.categorizer import categorize
 from backend.utils.log_setup import LoggerSetup
-from backend.utils.config_utils import load_config
+from backend.utils.config_utils import get_config
 
-CONFIG = load_config()
+CONFIG = get_config()
 
 API_ENDPOINT = f"{CONFIG.API.HOST}:{CONFIG.API.PORT}"
 UPDATE_DB_ENDPOINT = f"{API_ENDPOINT}/{CONFIG.API.ENDPOINTS.UPDATE_DB}"

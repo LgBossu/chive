@@ -22,13 +22,13 @@ from backend.models.app_models import (
 )
 from backend.models.message_tree import MessageTree
 from backend.utils.log_setup import LoggerSetup
-from backend.utils.config_utils import load_config
+from backend.utils.config_utils import get_config
 
 # Set up user logging
 logger_setup = LoggerSetup()
 LOG_PATH = logger_setup.configure_logger()
 
-API_CONFIG = load_config().API
+API_CONFIG = get_config().API
 CONFIG_ENDPOINTS = API_CONFIG.ENDPOINTS
 
 # [AI GENERATED CODE]

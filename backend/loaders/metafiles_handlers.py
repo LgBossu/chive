@@ -10,7 +10,7 @@ from loguru import logger
 
 from backend.loaders.chroma_endpoints import ChromaQuerier
 from backend.utils.path_utils import get_paths
-from backend.utils.config_utils import load_config
+from backend.utils.config_utils import get_config
 
 # TODO // # WARNING :
 # dynamic_tags is an FTS5 table used as a presence index (message_id → tags).
@@ -24,7 +24,7 @@ from backend.utils.config_utils import load_config
 # Verify if this is due to module level manipulation, design issues, or other factors.
 
 # Constant tags literals
-CONFIG = load_config()
+CONFIG = get_config()
 
 BLACKLIST_TAG = CONFIG.DB.LITERAL_TAGS.BLACKLIST_TAG
 EMPTY_TAG = CONFIG.DB.LITERAL_TAGS.EMPTY_TAG

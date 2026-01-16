@@ -19,7 +19,7 @@ from backend.loaders.metafiles_handlers import (
 from backend.models.app_models import CategorizerJobInfo, JobStatus
 from backend.models.categorizer_model import Categorizer0, CategorizerModel
 from backend.utils.log_setup import LoggerSetup
-from backend.utils.config_utils import load_config
+from backend.utils.config_utils import get_config
 
 from chromadb.api.types import GetResult
 
@@ -87,7 +87,7 @@ from chromadb.api.types import GetResult
 
 # TODO : make a list and scheme somewhere of WHO owns WHAT objects, to ensure proper and consistent resource freeing
 
-CONFIG = load_config()
+CONFIG = get_config()
 
 ABORT_SIGNAL = CONFIG.API.ABORT_SIGNAL
 NO_STALLING_ID = CONFIG.PARAMS.CATEGORIZER.NO_STALLING_ID
