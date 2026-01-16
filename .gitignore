@@ -21,7 +21,7 @@ __pypackages__/
 # Environments
 .env
 .venv
-env/
+env/*
 venv/
 ENV/
 env.bak/
