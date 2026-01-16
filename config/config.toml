@@ -12,18 +12,18 @@ BLACKLIST_TAG = "######"
 EMPTY_TAG = "##EMPTY##"
 NO_TAGS_TAG = "##NO_TAGS##"
 
-[CATEGORIZER]
+[PARAMS.CATEGORIZER]
 STALL_SECONDS = 60
 STALL_CHECK_FREQ = 5
 NO_STALLING_ID = "[NotAnId]"
 
-[MODELS.default_model_config]
+[PARAMS.MODELS.default_model_config]
 max_output_length = 128
 safety_input_length = 2048
 
-[MODELS.Categorizer0]
+[PARAMS.MODELS.Categorizer0]
 max_output_length = 128
 safety_input_length = 2048
 
-[HARDWARE.torch]
+[PARAMS.HARDWARE.torch]
 hardware_acceleration = "xpu"
