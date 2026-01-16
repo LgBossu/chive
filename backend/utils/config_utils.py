@@ -3,10 +3,10 @@ from typing import Dict, Optional
 import tomllib
 import os
 
-# --- Pydantic Models ---
+# --- MODULES CONFIG ---
 
+# API Endpoints Models
 
-# --- API Endpoints Models ---
 class EndpointActions(BaseModel):
     RUN: str
     ABORT: str
@@ -64,8 +64,7 @@ class AppConfig(BaseModel):
     DB: Database
     PARAMS: Params
 
-# --- Loader Function ---
-
+# Loader Function
 def load_config(path: Optional[str] = None) -> AppConfig:
     """Load the TOML config file into an AppConfig object."""
     if path is None:
@@ -74,8 +73,7 @@ def load_config(path: Optional[str] = None) -> AppConfig:
         data = tomllib.load(f)
     return AppConfig.model_validate(data)
 
-# --- Singleton Pattern for Shared Config ---
-
+# Singleton Pattern for Shared Config
 _config_instance: Optional[AppConfig] = None
 
 def get_config() -> AppConfig:
@@ -85,7 +83,35 @@ def get_config() -> AppConfig:
     return _config_instance
 
 
+# --- PROMPTS CONFIG ---
+
+class ModelPrompt(BaseModel):
+    prefix: str
+    suffix: str
+
+class PromptsConfig(BaseModel):
+    Categorizer0: ModelPrompt
+
+def load_prompts(path: Optional[str] = None) -> PromptsConfig:
+    """Load the TOML prompts config file into a PromptsConfig object."""
+    if path is None:
+        path = os.path.join(os.path.dirname(__file__), '../../config/prompts.toml')
+    with open(path, 'rb') as f:
+        data = tomllib.load(f)
+    return PromptsConfig.model_validate(data)
+
+# Singleton Pattern for Shared Prompts
+_prompts_instance: Optional[PromptsConfig] = None
+
+def get_prompts() -> PromptsConfig:
+    global _prompts_instance
+    if _prompts_instance is None:
+        _prompts_instance = load_prompts()
+    return _prompts_instance
+
 if __name__ == "__main__":
     # For testing purposes
-    config = load_config()
+    config = get_config()
     print(config.model_dump_json(indent=4))
+    prompts = get_prompts()
+    print(prompts.model_dump_json(indent=4))

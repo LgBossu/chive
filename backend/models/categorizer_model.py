@@ -13,9 +13,10 @@ from transformers.models.auto.tokenization_auto import AutoTokenizer
 from transformers.tokenization_utils import PreTrainedTokenizer
 
 from backend.utils.path_utils import get_paths
-from backend.utils.config_utils import load_config
+from backend.utils.config_utils import get_config, get_prompts
 
-CONFIG = load_config()
+CONFIG = get_config()
+PROMPTS = get_prompts()
 
 default_model_config = CONFIG.PARAMS.MODELS.default_model_config
 Cat0_config = CONFIG.PARAMS.MODELS.Categorizer0
@@ -129,8 +130,6 @@ class CategorizerModel(ABC):
         :return: A tuple containing the prefix and suffix of the prompt.
         :rtype: Tuple[str, str]
         """
-        # TODO : also consider storing the prompts in a separate proper file,
-        # to avoid hardcoding and allow for easy editing and tuning.
         pass
 
     @property
@@ -389,30 +388,8 @@ class Categorizer0(CategorizerModel):
         :return: A tuple containing the prefix and suffix of the prompt.
         :rtype: Tuple[str, str]
         """
-
-        prompt_begin = """You are a helpful assistant. Given a user message, your job is to identify its main topic(s) or emotional theme(s) in a few simple words.
-
-- Return a short, comma-separated list of themes.
-- Output only the list.
-- If the message has no meaningful content, respond with: none.
-- End your response with <END>.
-
-Here are some examples:
-
-MESSAGE: [ok lol!]
-CATEGORIZATION: none <END>
-
-MESSAGE: [I'm feeling a bit overwhelmed, but also proud of the work I did today.]
-CATEGORIZATION: stress, accomplishment, self-reflection <END>
-
-MESSAGE: [I just made saffron rice with lemon and it actually turned out amazing!]
-CATEGORIZATION: cooking, food, pride <END>
-
-MESSAGE: ["""  # noqa: E501
-
-        prompt_end = """]
-CATEGORIZATION:"""
-
+        prompt_begin = PROMPTS.Categorizer0.prefix
+        prompt_end = PROMPTS.Categorizer0.suffix
         return prompt_begin, prompt_end
 
     @property
@@ -430,7 +407,7 @@ CATEGORIZATION:"""
         # Always call:  preds = model.generate(**tok, **config.DECODING)
         # so any future tweak happens in a single place and can be guarded by tests.
 
-        parameters = {
+        parameters = { # TODO : de-hardcode
             "min_length": 1,  # Make sure it returns *something*
             "repetition_penalty": 1.1,
             # no_repeat_ngram_size:2,
