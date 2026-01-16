@@ -5,7 +5,21 @@ PORT = 8000
 ABORT_SIGNAL = "##ABORT##"
 
 [API.ENDPOINTS]
-UPDATE_DB = "update_db/update"
+UPDATE_DB_ROOT = "update_db"
+CATEGORIZER_ROOT = "categorizer"
+SEARCH_ROOT = "search"
+
+[API.ENDPOINTS.UPDATE_DB]
+RUN = "update_db/run"
+ABORT = "update_db/abort"
+UPDATE = "update_db/update"
+STATUS = "update_db/status"
+
+[API.ENDPOINTS.CATEGORIZER]
+RUN = "categorizer/run"
+ABORT = "categorizer/abort"
+UPDATE = "categorizer/update"
+STATUS = "categorizer/status"
 
 [DB.LITERAL_TAGS]
 BLACKLIST_TAG = "######"

@@ -5,15 +5,26 @@ import os
 
 # --- Pydantic Models ---
 
-class APIEndpoints(BaseModel):
-    UPDATE_DB: str
+
+# --- API Endpoints Models ---
+class EndpointActions(BaseModel):
+    RUN: str
+    ABORT: str
+    UPDATE: str
+    STATUS: str
+
+class APIEndpointsGroup(BaseModel):
+    UPDATE_DB_ROOT: str
+    CATEGORIZER_ROOT: str
+    SEARCH_ROOT: str
+    UPDATE_DB: EndpointActions
+    CATEGORIZER: EndpointActions
 
 class APIConfig(BaseModel):
     HOST: str
     PORT: int
-    ENDPOINTS: APIEndpoints
-    ABORT_SIGNAL: str # TODO : move ABORT_SIGNAL to a specific level 
-                      # (this is specific to Categorizer actions, not API-wide)
+    ENDPOINTS: APIEndpointsGroup
+    ABORT_SIGNAL: str  # TODO: move ABORT_SIGNAL to a specific level
 
 class LiteralTags(BaseModel):
     BLACKLIST_TAG: str
@@ -46,6 +57,7 @@ class Params(BaseModel):
     MODELS: Models
     HARDWARE: HardwareConfig
     CATEGORIZER: CategorizerConfig
+
 
 class AppConfig(BaseModel):
     API: APIConfig
