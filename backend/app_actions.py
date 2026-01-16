@@ -19,7 +19,7 @@ from backend.utils.config_utils import get_config
 CONFIG = get_config()
 
 API_ENDPOINT = f"{CONFIG.API.HOST}:{CONFIG.API.PORT}"
-UPDATE_DB_ENDPOINT = f"{API_ENDPOINT}/{CONFIG.API.ENDPOINTS.UPDATE_DB}"
+UPDATE_DB_ENDPOINT = f"{API_ENDPOINT}{CONFIG.API.ENDPOINTS.UPDATE_DB}"
 
 
 def update_db(log_path: Path):
