@@ -36,10 +36,14 @@ class Paths:
     small_model_path: Path
 
 
-def get_paths() -> Paths:
-    logger.debug("Summoned get_paths")
-    return Paths(
-        # Use SESSION_TIMESTAMP so the filename is static during the session.
+# --- Singleton Pattern for Shared Paths ---
+_paths_instance: Paths | None = None
+
+def load_paths() -> Paths:
+    """Initialize and cache the Paths instance from environment variables."""
+    global _paths_instance
+    logger.debug("Initializing and caching Paths instance")
+    _paths_instance = Paths(
         log_file=Path(os.environ["LOG_PATH"].format(time=SESSION_TIMESTAMP)),
 
         source_conversations_path=Path(os.environ["SOURCE_JSON_PATH"]),
@@ -55,6 +59,16 @@ def get_paths() -> Paths:
 
         small_model_path=Path(os.environ["SMALL_LLM_MODEL_PATH"]),
     )
+    return _paths_instance
+
+def get_paths() -> Paths:
+    """Get the cached Paths instance, initializing if necessary."""
+    global _paths_instance
+    if _paths_instance is None:
+        logger.debug("Paths instance not initialized, calling load_paths()")
+        return load_paths()
+    logger.trace("Returning cached Paths instance")
+    return _paths_instance
 
 
 if __name__ == "__main__":
