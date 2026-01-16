@@ -953,3 +953,19 @@ class CategorizerEngine:
             logger.critical("Categorization subprocess ended abnormally. Please check the logs for details.")
         logger.info("Categorization engine shutting down.")
         # TODO : check if any remaining resources need to be freed
+
+
+def categorize(log_path: Path, api_endpoint: str, console_log_level: str = "DEBUG") -> None:
+    """
+    Categorize messages in the database by running the CategorizerEngine with provided parameters.
+    """
+    # Initialize the categorizer engine
+    categorizer_engine = CategorizerEngine(
+        api_endpoint=f"{api_endpoint}/categorizer",
+        LOG_FILE=log_path,
+        CONSOLE_LOG_LEVEL=console_log_level,
+    )
+    
+    categorizer_engine.run_categorization()
+    
+    return None
