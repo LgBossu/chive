@@ -1,0 +1,22 @@
+[API]
+HOST = "http://127.0.0.1"
+PORT = 8000
+ABORT_SIGNAL = "##ABORT##"
+
+[API.URL]
+UPDATE_DB = "update_db/update"
+
+[DB.LITERAL_TAGS]
+BLACKLIST_TAG = "######"
+EMPTY_TAG = "##EMPTY##"
+NO_TAGS_TAG = "##NO_TAGS##"
+
+[CATEGORIZER]
+STALL_SECONDS = 60 # When a message takes too long to be categorized and the model is considered stalled.
+STALL_CHECK_FREQ = 5
+
+[MODELS]
+max_output_length = 128
+
+[HARDWARE.torch]
+hardware_acceleration = "xpu"
