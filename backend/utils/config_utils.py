@@ -71,3 +71,9 @@ def get_config() -> AppConfig:
     if _config_instance is None:
         _config_instance = load_config()
     return _config_instance
+
+
+if __name__ == "__main__":
+    # For testing purposes
+    config = load_config()
+    print(config.model_dump_json(indent=4))
