@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
-from backend.app_actions import categorize, search_database, update_db
+from backend.app_actions import app_categorize, search_database, update_db
 from backend.models.app_models import (
     CategorizerJobInfo,
     CommandResponse,
@@ -208,7 +208,7 @@ async def categorizer_start():
     cache.current_message_id = None
     cache.current_speed = None
 
-    p = Process(target=categorize, args=(LOG_PATH,))  # Pass the log path to the categorize function
+    p = Process(target=app_categorize, args=(LOG_PATH,))  # Pass the log path to the categorize function
     p.start()
     return PlainResponse(message="Categorizer job started.")
 

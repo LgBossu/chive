@@ -12,7 +12,7 @@ from backend.models.app_models import (
     UpdaterJobInfo,
 )
 from backend.models.message_node import MessageNode
-from backend.processing.categorizer import CategorizerEngine
+from backend.processing.categorizer import categorize
 from backend.utils.log_setup import LoggerSetup
 
 API_ENDPOINT = "http://127.0.0.1:8000"  # TODO : do not hardcode endpoints
@@ -49,7 +49,7 @@ def update_db(log_path: Path):
     return None
 
 
-def categorize(log_path: Path):
+def app_categorize(log_path: Path):
     """
     Categorize messages in the database.
 
@@ -61,14 +61,8 @@ def categorize(log_path: Path):
     logger_setup = LoggerSetup()
     logger_setup.configure_logger(force_log_file=log_path, console_level="DEBUG")
 
-    # Initialize the categorizer engine
-    categorizer_engine = CategorizerEngine(
-        api_endpoint=f"{API_ENDPOINT}/categorizer",
-        LOG_FILE=log_path,
-        CONSOLE_LOG_LEVEL="DEBUG",
-    )
     try:
-        categorizer_engine.run_categorization()
+        categorize(log_path=log_path, api_endpoint=API_ENDPOINT, console_log_level="DEBUG")
     except Exception as e:
         # Listen for errors during execution and notify the user
         logger.error(f"Failed to categorize messages: {e}")
