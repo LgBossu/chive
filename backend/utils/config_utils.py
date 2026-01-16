@@ -12,7 +12,8 @@ class APIConfig(BaseModel):
     HOST: str
     PORT: int
     ENDPOINTS: APIEndpoints
-    ABORT_SIGNAL: str
+    ABORT_SIGNAL: str # TODO : move ABORT_SIGNAL to a specific level 
+                      # (this is specific to Categorizer actions, not API-wide)
 
 class LiteralTags(BaseModel):
     BLACKLIST_TAG: str
@@ -22,11 +23,13 @@ class LiteralTags(BaseModel):
 class Database(BaseModel):
     LITERAL_TAGS: LiteralTags
 
-class CategorizerModel(BaseModel):
+class InferenceModel(BaseModel):
     max_output_length: int
+    safety_input_length: int
 
 class Models(BaseModel):
-    Categorizer0: CategorizerModel
+    default_model_config: InferenceModel
+    Categorizer0: InferenceModel
 
 class TorchConfig(BaseModel):
     hardware_acceleration: str
@@ -34,9 +37,15 @@ class TorchConfig(BaseModel):
 class HardwareConfig(BaseModel):
     torch: TorchConfig
 
+class CategorizerConfig(BaseModel):
+    STALL_SECONDS: int
+    STALL_CHECK_FREQ: int
+    NO_STALLING_ID: str
+
 class Params(BaseModel):
     MODELS: Models
     HARDWARE: HardwareConfig
+    CATEGORIZER: CategorizerConfig
 
 class AppConfig(BaseModel):
     API: APIConfig

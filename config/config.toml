@@ -1,3 +1,4 @@
+
 [API]
 HOST = "http://127.0.0.1"
 PORT = 8000
@@ -12,11 +13,17 @@ EMPTY_TAG = "##EMPTY##"
 NO_TAGS_TAG = "##NO_TAGS##"
 
 [CATEGORIZER]
-STALL_SECONDS = 60 # When a message takes too long to be categorized and the model is considered stalled.
+STALL_SECONDS = 60
 STALL_CHECK_FREQ = 5
+NO_STALLING_ID = "[NotAnId]"
 
-[MODELS]
+[MODELS.default_model_config]
 max_output_length = 128
+safety_input_length = 2048
+
+[MODELS.Categorizer0]
+max_output_length = 128
+safety_input_length = 2048
 
 [HARDWARE.torch]
 hardware_acceleration = "xpu"

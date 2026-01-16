@@ -13,7 +13,12 @@ from transformers.models.auto.tokenization_auto import AutoTokenizer
 from transformers.tokenization_utils import PreTrainedTokenizer
 
 from backend.utils.path_utils import get_paths
+from backend.utils.config_utils import load_config
 
+CONFIG = load_config()
+
+default_model_config = CONFIG.PARAMS.MODELS.default_model_config
+Cat0_config = CONFIG.PARAMS.MODELS.Categorizer0
 
 class CategorizerModel(ABC):
     """
@@ -193,7 +198,9 @@ class CategorizerModel(ABC):
         """
         pass
 
-    def _generate(self, input_tokens, max_output_length: int = 128):
+
+
+    def _generate(self, input_tokens, max_output_length: int = default_model_config.max_output_length):
         """
         Generates a response from the model based on the input tokens.
 
@@ -201,8 +208,6 @@ class CategorizerModel(ABC):
         :param max_output_length: The maximum length of the generated output.
         :return: The generated output from the model.
         """
-        # TODO : max_output length should be configurable, not hardcoded.
-
         logger.debug("Generating response from the model.")
         with torch.no_grad():
             output = self.model.generate(
@@ -253,7 +258,7 @@ class CategorizerModel(ABC):
         self,
         message: str,
         max_output_length: Optional[int] = None,
-        safety_input_length: int = 2048,
+        safety_input_length: Optional[int] = None,
     ) -> List[str]:
         """
         Categorizes the given message by constructing a prompt, tokenizing it,
@@ -265,6 +270,8 @@ class CategorizerModel(ABC):
         """
         if max_output_length is None:
             max_output_length = self.recommended_output_length
+        if safety_input_length is None:
+            safety_input_length = self.safe_max_length
 
         logger.trace("Categorizing message")
         full_prompt = self._construct_full_prompt(message)
@@ -447,7 +454,7 @@ CATEGORIZATION:"""
         :return: The maximum length in tokens.
         :rtype: int
         """
-        return 2048
+        return CONFIG.PARAMS.MODELS.Categorizer0.safety_input_length
 
     def _clean_llm_output(self, output: str) -> str:
         """
