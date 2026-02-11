@@ -3,7 +3,7 @@
 This project is designed to handle post-processing tasks for ChatGPT outputs. Below, you'll find the necessary information to set up and run the project.
 Insofar, this is a private prototype, justifying my rather loose structuring of the project and approximate documentation.
 
-*Note that this project is to be considered an early prototype. Versioning can be tracked in the `pyproject.toml`, with a now unified versioning scheme. We are currently at version `alpha-3.∞`, preparing migration to versions `alpha 4`.*
+*Note that this project is to be considered an early prototype. Versioning can be tracked in the `pyproject.toml`, with a now unified versioning scheme. We are currently at version `alpha-3.∞`, preparing migration to versions `alpha-4`.*
 
 ## Directory Structure
 
