@@ -258,6 +258,11 @@ async def categorizer_update(update: CategorizerJobInfo):
         logger.info("Categorizer job was aborted.")
         # Reset command to default after abort
         app.state.cache.categorizer_command = CommandValue.DEFAULT
+    elif update.status == JobStatus.STALLED:
+        # When the job stalls, we need to reset the current message ID
+        # to make sure the categorizer.CategorizerEngine.Supervisor does not abusively
+        # flag ghost stalls
+        cache.current_message_id = None
 
     else:
         # Regular update
