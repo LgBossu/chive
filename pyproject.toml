@@ -1,7 +1,7 @@
 [tool.poetry]
-name = "chatgpt-post-processing"
+name = "chive"
 version = "alpha-3.∞"
-description = "A project about post-processing my ChatGPT conversations."
+description = "Chat History Indexing & Visualization Environment -- A project about post-processing my ChatGPT conversations."
 authors = ["Louis-Guillaume Bossu <louis-guillaume.bossu@polytechnique.org>"]
 package-mode = false
 
