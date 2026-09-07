@@ -1,7 +1,9 @@
 > **Source availability:** This repository is publicly available for portfolio and code-review purposes. It is not open-source software, and no general permission is granted to reuse, modify, redistribute, or deploy its contents. See [LICENSE](LICENSE.txt).
 
 
-# ChatGPT Post Processing
+# CHIVE
+
+> Chat History Indexing & Visualization Environment
 
 This project is designed to handle post-processing tasks for ChatGPT outputs. Below, you'll find the necessary information to set up and run the project.
 Insofar, this is a private prototype, justifying my rather loose structuring of the project and approximate documentation.
