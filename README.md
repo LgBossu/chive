@@ -1,3 +1,6 @@
+> **Source availability:** This repository is publicly available for portfolio and code-review purposes. It is not open-source software, and no general permission is granted to reuse, modify, redistribute, or deploy its contents. See [LICENSE](LICENSE.txt).
+
+
 # ChatGPT Post Processing
 
 This project is designed to handle post-processing tasks for ChatGPT outputs. Below, you'll find the necessary information to set up and run the project.
@@ -50,7 +53,3 @@ The project roughly follows the directory structure below:
 
 - Ensure the `path.env` file is not included in version control for security reasons.
 - The `data/` directory is used for input/output files and should be structured as required by the project.
-
-## License
-
-Uhm, if I have made this repo public without noting the license, that's my bad. I'm noting it as #TODO in the meantime.
