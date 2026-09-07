@@ -1,0 +1,10 @@
+Copyright © 2026 Louis-Guillaume Bossu
+All rights reserved.
+
+This repository and its contents are made publicly available solely for inspection and portfolio or review purposes. They are not open-source software.
+
+Except for the limited rights granted through GitHub’s Terms of Service and any rights that cannot lawfully be restricted, no permission is granted to use, copy, modify, publish, distribute, sublicense, sell, deploy, or create derivative works from any part of this repository without the prior written permission of the copyright holder.
+
+Third-party material included in or referenced by this repository remains subject to its respective licenses. This notice applies only to material for which Louis-Guillaume Bossu holds the copyright.
+
+THE MATERIAL IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED.
